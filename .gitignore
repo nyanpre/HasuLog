@@ -67,6 +67,7 @@ web_modules/
 
 # dotenv environment variable files
 .env
+.env.local
 .env.*
 !.env.example
 
@@ -118,6 +119,7 @@ dist
 
 # Firebase cache directory
 .firebase/
+serviceAccountKey.json
 
 # TernJS port file
 .tern-port
@@ -141,3 +143,10 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
+
+# Python
+__pycache__/
+*.pyc
+
+# Scraped data
+backend/data/
