@@ -1,21 +1,18 @@
-// src/App.tsx
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import Layout from "./components/Layout";
-import Home from "./components/pages/Home";
-import History from "./components/pages/History"; // ← 追加
-import Profile from "./components/pages/Profile"; // ← 追加
+// hasulog/src/App.tsx
+
+import { StreamList } from "./components/StreamList";
 
 function App() {
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<Layout />}>
-          <Route index element={<Home />} />
-          <Route path="history" element={<History />} />
-          <Route path="profile" element={<Profile />} />
-        </Route>
-      </Routes>
-    </BrowserRouter>
+    <div>
+      <header className="bg-gray-800 text-white p-4 text-center">
+        <h1 className="text-xl font-bold">HasuLog</h1>
+      </header>
+      
+      <main>
+        <StreamList />
+      </main>
+    </div>
   );
 }
 

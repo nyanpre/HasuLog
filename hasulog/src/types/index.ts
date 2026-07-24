@@ -1,12 +1,26 @@
-// src/types/index.ts
+// hasulog/src/types/index.ts
 
-export type VideoType = 'with_meets' | 'activity_record';
+// ▼ 今回新しく追加したFirestore用のデータ型
+export interface StreamData {
+  id: string;
+  season: string;
+  type: string; // 'with_meets' | 'with_station'
+  date: string;
+  title: string;
+  participants: string;
+  youtubeUrl: string;
+  thumbnailUrl: string;
+  description: string;
+}
 
+// ▼ 既存のコンポーネント（HomeやVideoCardなど）で使われている型
 export interface VideoData {
   id: string;
+  type: string; // 'with_meets' | 'with_station'
+  date: string;
   title: string;
   thumbnailUrl: string;
-  date: string;
-  type: VideoType;
-  isWatched: boolean;
+  youtubeUrl: string;
+  participants?: string;
+  description?: string;
 }
