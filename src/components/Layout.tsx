@@ -1,7 +1,14 @@
+// src/components/Layout.tsx
 import { Outlet, Link } from "react-router-dom";
 import { Home, History, User } from "lucide-react";
+import { type ReactNode } from "react";
 
-export default function Layout() {
+// children をオプショナル（?）で受け取れるように型を定義
+interface LayoutProps {
+  children?: ReactNode;
+}
+
+export default function Layout({ children }: LayoutProps) {
   return (
     <div className="flex flex-col min-h-screen bg-gray-50">
       {/* ヘッダー */}
@@ -11,9 +18,9 @@ export default function Layout() {
         </div>
       </header>
 
-      {/* メインコンテンツ（各画面がここに入ります） */}
+      {/* メインコンテンツ（App.tsxから渡された画面、またはRouterの画面が入ります） */}
       <main className="flex-1 overflow-y-auto pb-20">
-        <Outlet />
+        {children || <Outlet />}
       </main>
 
       {/* ボトムナビゲーション */}
