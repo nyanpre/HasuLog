@@ -23,4 +23,5 @@ export interface VideoData {
   youtubeUrl: string;
   participants?: string;
   description?: string;
+  isWatched?: boolean;
 }
