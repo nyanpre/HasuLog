@@ -1,6 +1,6 @@
 // src/components/profile/FriendList.tsx
 import { useState } from 'react';
-import { Users, Search, UserPlus, Check, X, User } from 'lucide-react';
+import { Users, Search, UserPlus, User } from 'lucide-react';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { useAuth } from '../../contexts/AuthContext';
