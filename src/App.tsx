@@ -2,11 +2,13 @@
 import { signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
 import { auth } from './firebase';
 import { useAuth } from './contexts/AuthContext';
-import { Routes, Route } from 'react-router-dom';
+// 🌟 Navigate を追加インポート
+import { Routes, Route, Navigate } from 'react-router-dom';
 
-// 既存のコンポーネントを読み込む
 import Layout from './components/Layout';
-import { StreamList } from './components/StreamList'; // 🌟 元のデータ表示コンポーネントを復活！
+import { StreamList } from './components/StreamList';
+import Profile from './components/pages/Profile';
+import { History } from './components/pages/History';
 
 export default function App() {
   const { currentUser, loading } = useAuth();
@@ -20,7 +22,6 @@ export default function App() {
     }
   };
 
-  // 認証状態を確認中の場合はローディング表示（チラつき防止）
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -29,24 +30,21 @@ export default function App() {
     );
   }
 
-  // 🌟 ログイン済みの場合：HasuLogのメイン画面とルーティングを表示
   if (currentUser) {
     return (
       <Layout>
-        {/* URLに応じて表示する中身を切り替える設定 */}
         <Routes>
-          {/* ホーム（/）にアクセスしたときは、元の StreamList を表示 */}
           <Route path="/" element={<StreamList />} />
+          <Route path="/history" element={<History />} />
+          <Route path="/profile" element={<Profile />} />
           
-          {/* 履歴とマイページは、とりあえずの仮置き画面（後で拡張できます） */}
-          <Route path="/history" element={<div className="p-8 text-center text-gray-500">履歴ページ（準備中）</div>} />
-          <Route path="/profile" element={<div className="p-8 text-center text-gray-500">マイページ（準備中）</div>} />
+          {/* 🌟 追加：上記以外のURLで開かれた場合、強制的にホーム(/)へリダイレクト */}
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Layout>
     );
   }
 
-  // 🌟 未ログインの場合：ログイン画面を表示
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50">
       <div className="p-8 bg-white rounded-lg shadow-md text-center max-w-sm w-full">

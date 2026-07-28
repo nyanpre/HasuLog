@@ -1,10 +1,10 @@
-// hasulog/src/types/index.ts
+// src/types/index.ts
+// (既存の StreamData や VideoData はそのまま残しておいてください)
 
-// ▼ 今回新しく追加したFirestore用のデータ型
 export interface StreamData {
   id: string;
   season: string;
-  type: string; // 'with_meets' | 'with_station'
+  type: string;
   date: string;
   title: string;
   participants: string;
@@ -13,10 +13,9 @@ export interface StreamData {
   description: string;
 }
 
-// ▼ 既存のコンポーネント（HomeやVideoCardなど）で使われている型
 export interface VideoData {
   id: string;
-  type: string; // 'with_meets' | 'with_station'
+  type: string;
   date: string;
   title: string;
   thumbnailUrl: string;
@@ -24,4 +23,12 @@ export interface VideoData {
   participants?: string;
   description?: string;
   isWatched?: boolean;
+}
+
+// 🌟 今回新しく追加するプロフィール用の型
+export interface UserProfileData {
+  oshiMember: string;
+  oshiMeets: string;
+  oshiRecord: string;
+  oshiFesLive: string;
 }
