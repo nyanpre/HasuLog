@@ -1,66 +1,107 @@
 // src/components/profile/FriendTimeline.tsx
 import { useEffect, useState } from 'react';
-import { Clock, PlayCircle } from 'lucide-react';
-import { collection, getDocs, query, orderBy, limit } from 'firebase/firestore';
+import { Clock, PlayCircle, MessageSquare, Star, Loader2, Sparkles } from 'lucide-react'; // 🌟 Sparklesアイコン追加
+import { collection, getDocs, query, orderBy, limit, doc, getDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { useFriends } from '../../hooks/useFriends';
+import { useAuth } from '../../contexts/AuthContext';
+import { StreamDetailModal } from '../stream/StreamDetailModal';
+import { useUserRecords } from '../../hooks/useUserRecords';
+import type { StreamData } from '../../types';
 
 interface TimelineItem {
   id: string;
+  streamId: string;
   uid: string;
   userName: string;
   userPhotoURL?: string;
   title: string;
   lastViewedAt: number;
+  lastAction: string;
 }
 
 export const FriendTimeline = () => {
   const { friends } = useFriends();
+  const { currentUser } = useAuth();
+  const { records: myRecords, updateRecord: myUpdateRecord } = useUserRecords();
+  
   const [timeline, setTimeline] = useState<TimelineItem[]>([]);
   const [loading, setLoading] = useState(false);
+  const [globalStreamTitles, setGlobalStreamTitles] = useState<Record<string, string>>({});
+  const [selectedStream, setSelectedStream] = useState<StreamData | null>(null);
+
+  useEffect(() => {
+    const fetchStreams = async () => {
+      try {
+        const snap = await getDocs(collection(db, "streams"));
+        const titlesObj: Record<string, string> = {};
+        snap.forEach(doc => {
+          titlesObj[doc.id] = doc.data().title;
+        });
+        setGlobalStreamTitles(titlesObj);
+      } catch (error) {
+        console.error("動画タイトルの取得に失敗しました", error);
+      }
+    };
+    fetchStreams();
+  }, []);
 
   useEffect(() => {
     const fetchTimeline = async () => {
-      // フレンドがいない場合は処理しない
-      if (friends.length === 0) {
-        setTimeline([]);
-        return;
-      }
+      if (!currentUser) return;
       
       setLoading(true);
       try {
         const allLogs: TimelineItem[] = [];
+        const targetUsers = [
+          {
+            uid: currentUser.uid,
+            displayName: currentUser.displayName || 'あなた',
+            photoURL: currentUser.photoURL || undefined
+          },
+          ...friends
+        ];
 
-        // 全フレンドの最新視聴履歴（直近5件）を並列で取得
-        const promises = friends.map(async (friend) => {
-          const recordsRef = collection(db, 'users', friend.uid, 'records');
-          const q = query(recordsRef, orderBy('lastViewedAt', 'desc'), limit(5));
+        const promises = targetUsers.map(async (user) => {
+          const recordsRef = collection(db, 'users', user.uid, 'watchHistory');
+          const q = query(recordsRef, orderBy('updatedAt', 'desc'), limit(8)); 
           
           try {
             const snapshot = await getDocs(q);
             snapshot.forEach((doc) => {
               const data = doc.data();
-              if (data.lastViewedAt) {
-                const dateObj = new Date(data.lastViewedAt);
+              
+              if (data.lastAction === 'decrease' || data.viewCount === 0) return;
+
+              let activityTime = 0;
+              if (data.updatedAt) {
+                activityTime = typeof data.updatedAt === 'string' 
+                  ? new Date(data.updatedAt).getTime() 
+                  : (data.updatedAt.toMillis ? data.updatedAt.toMillis() : 0);
+              }
+              if (!activityTime && data.lastViewedAt) {
+                activityTime = new Date(data.lastViewedAt).getTime();
+              }
+
+              if (activityTime > 0) {
                 allLogs.push({
-                  id: `${friend.uid}-${doc.id}`,
-                  uid: friend.uid,
-                  userName: friend.displayName,
-                  userPhotoURL: friend.photoURL,
-                  title: data.streamTitle || data.title || '視聴記録',
-                  lastViewedAt: dateObj.getTime(),
+                  id: `${user.uid}-${doc.id}`,
+                  streamId: doc.id,
+                  uid: user.uid,
+                  userName: user.uid === currentUser.uid ? 'あなた' : user.displayName,
+                  userPhotoURL: user.photoURL,
+                  title: data.streamTitle || data.title || globalStreamTitles[doc.id] || '視聴記録',
+                  lastViewedAt: activityTime,
+                  lastAction: data.lastAction || 'watch'
                 });
               }
             });
           } catch (err) {
-            console.warn(`${friend.displayName}の履歴取得に失敗しました`, err);
-            // ※Firestoreのインデックスエラーが出た場合は無視して次に進める
+            console.warn(`${user.displayName}の履歴取得に失敗しました`, err);
           }
         });
 
         await Promise.all(promises);
-
-        // 全フレンドのログを時系列（新しい順）に並び替え、全体で最新20件に絞る
         const sortedLogs = allLogs.sort((a, b) => b.lastViewedAt - a.lastViewedAt).slice(0, 20);
         setTimeline(sortedLogs);
       } catch (error) {
@@ -70,10 +111,11 @@ export const FriendTimeline = () => {
       }
     };
 
-    fetchTimeline();
-  }, [friends]);
+    if (Object.keys(globalStreamTitles).length > 0 || timeline.length === 0) {
+      fetchTimeline();
+    }
+  }, [friends, currentUser, globalStreamTitles]);
 
-  // 相対時間を計算する関数（例: "2時間前"）
   const getRelativeTime = (timestamp: number) => {
     const now = Date.now();
     const diffInMinutes = Math.floor((now - timestamp) / (1000 * 60));
@@ -87,57 +129,105 @@ export const FriendTimeline = () => {
     return '1ヶ月以上前';
   };
 
-  return (
-    <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm h-full flex flex-col min-h-[350px]">
-      <h3 className="text-sm font-bold text-gray-800 mb-5 flex items-center">
-        <Clock className="w-4 h-4 mr-2 text-blue-500" />
-        みんなのアクティビティ
-      </h3>
+  const handleOpenStreamDetail = async (streamId: string) => {
+    try {
+      const streamDoc = await getDoc(doc(db, "streams", streamId));
+      if (streamDoc.exists()) {
+        setSelectedStream({ id: streamDoc.id, ...streamDoc.data() } as StreamData);
+      } else {
+        alert("動画データが見つかりませんでした。");
+      }
+    } catch (e) {
+      console.error(e);
+      alert("動画データの取得に失敗しました。");
+    }
+  };
 
-      <div className="flex-grow overflow-y-auto custom-scrollbar pr-2">
-        {loading ? (
-          <div className="flex justify-center py-8">
-            <span className="w-6 h-6 border-2 border-gray-200 border-t-blue-500 rounded-full animate-spin" />
-          </div>
-        ) : timeline.length === 0 ? (
-          <div className="text-center py-10 flex flex-col items-center justify-center text-gray-400">
-            <Clock className="w-10 h-10 mb-2 opacity-20" />
-            <p className="text-xs">まだフレンドの視聴履歴がありません</p>
-          </div>
-        ) : (
-          <div className="relative border-l-2 border-gray-100 ml-3 pl-5 space-y-5 pb-2">
-            {timeline.map((item) => (
-              <div key={item.id} className="relative group">
-                {/* タイムラインの丸ポチ */}
-                <div className="absolute -left-[27px] top-1.5 w-3 h-3 rounded-full bg-blue-100 border-2 border-blue-400 group-hover:bg-blue-400 transition-colors" />
+  return (
+    <>
+      <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm h-full flex flex-col min-h-[350px]">
+        <h3 className="text-sm font-bold text-gray-800 mb-5 flex items-center">
+          <Clock className="w-4 h-4 mr-2 text-blue-500" />
+          みんなのアクティビティ
+        </h3>
+
+        <div className="flex-grow overflow-y-auto custom-scrollbar pr-2">
+          {loading ? (
+            <div className="flex justify-center py-8">
+              <Loader2 className="w-6 h-6 text-blue-500 animate-spin" />
+            </div>
+          ) : timeline.length === 0 ? (
+            <div className="text-center py-10 flex flex-col items-center justify-center text-gray-400">
+              <Clock className="w-10 h-10 mb-2 opacity-20" />
+              <p className="text-xs">まだアクティビティがありません</p>
+            </div>
+          ) : (
+            <div className="relative border-l-2 border-gray-100 ml-3 pl-5 space-y-5 pb-2">
+              {timeline.map((item) => {
+                // 🌟 おすすめ判定を追加
+                const isMemo = item.lastAction === 'memo';
+                const isFav = item.lastAction === 'favorite';
+                const isRecommended = item.lastAction === 'recommended_watch';
                 
-                <div className="flex items-start gap-3">
-                  {item.userPhotoURL ? (
-                    <img src={item.userPhotoURL} alt={item.userName} className="w-8 h-8 rounded-full object-cover border border-gray-200 flex-shrink-0 shadow-sm" />
-                  ) : (
-                    <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 font-bold text-xs flex-shrink-0 shadow-sm">
-                      {item.userName.charAt(0)}
-                    </div>
-                  )}
-                  
-                  <div className="flex-grow bg-gray-50/80 hover:bg-gray-50 p-3 rounded-lg border border-gray-100 transition-colors">
-                    <div className="flex justify-between items-baseline mb-1.5">
-                      <span className="text-xs font-bold text-gray-700">{item.userName}</span>
-                      <span className="text-[10px] font-medium text-gray-400 bg-white px-2 py-0.5 rounded-full border border-gray-100">
-                        {getRelativeTime(item.lastViewedAt)}
-                      </span>
-                    </div>
-                    <div className="text-sm font-medium text-gray-800 flex items-start gap-1.5">
-                      <PlayCircle className="w-4 h-4 text-pink-500 flex-shrink-0 mt-0.5" />
-                      <span className="line-clamp-2 leading-tight">{item.title}</span>
+                const actionText = isMemo ? "がメモを更新しました" 
+                                 : isFav ? "がお気に入り登録しました" 
+                                 : isRecommended ? "が今日のおすすめを視聴しました" 
+                                 : "が視聴しました";
+                
+                // おすすめの場合はキラキラアイコン(Sparkles)にする
+                const Icon = isMemo ? MessageSquare : isFav ? Star : isRecommended ? Sparkles : PlayCircle;
+                const iconColor = isMemo ? "text-blue-500" : isFav ? "text-yellow-500" : isRecommended ? "text-emerald-500" : "text-pink-500";
+
+                return (
+                  <div key={item.id} className="relative group">
+                    <div className="absolute -left-[27px] top-1.5 w-3 h-3 rounded-full bg-blue-100 border-2 border-blue-400 group-hover:bg-blue-400 transition-colors" />
+                    
+                    <div className="flex items-start gap-3">
+                      {item.userPhotoURL ? (
+                        <img src={item.userPhotoURL} alt={item.userName} className="w-8 h-8 rounded-full object-cover border border-gray-200 flex-shrink-0 shadow-sm" />
+                      ) : (
+                        <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 font-bold text-xs flex-shrink-0 shadow-sm">
+                          {item.userName.charAt(0)}
+                        </div>
+                      )}
+                      
+                      <div 
+                        onClick={() => handleOpenStreamDetail(item.streamId)}
+                        className="flex-grow bg-gray-50/80 hover:bg-gray-50 p-3 rounded-lg border border-gray-100 transition-colors cursor-pointer"
+                      >
+                        <div className="flex justify-between items-baseline mb-1.5">
+                          <span className={`text-xs font-bold ${item.uid === currentUser?.uid ? 'text-blue-600' : 'text-gray-700'}`}>
+                            {item.userName} <span className="text-gray-500 font-normal">{actionText}</span>
+                          </span>
+                          <span className="text-[10px] font-medium text-gray-400 bg-white px-2 py-0.5 rounded-full border border-gray-100">
+                            {getRelativeTime(item.lastViewedAt)}
+                          </span>
+                        </div>
+                        <div className="text-sm font-medium text-gray-800 flex items-start gap-1.5">
+                          <Icon className={`w-4 h-4 ${iconColor} flex-shrink-0 mt-0.5`} />
+                          <span className="line-clamp-2 leading-tight group-hover:text-blue-600 transition-colors">
+                            {isRecommended && <span className="text-emerald-600 text-xs mr-1 bg-emerald-50 px-1 py-0.5 rounded border border-emerald-100">おすすめ</span>}
+                            {item.title}
+                          </span>
+                        </div>
+                      </div>
                     </div>
                   </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
+                );
+              })}
+            </div>
+          )}
+        </div>
       </div>
-    </div>
+
+      {selectedStream && (
+        <StreamDetailModal 
+          stream={selectedStream} 
+          record={myRecords[selectedStream.id] || null}
+          onClose={() => setSelectedStream(null)} 
+          onUpdateRecord={myUpdateRecord}
+        />
+      )}
+    </>
   );
 };

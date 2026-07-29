@@ -16,7 +16,7 @@ export default function Recommendation() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const fetchRandomStream = async () => {
+    const fetchTodayStream = async () => {
       try {
         const querySnapshot = await getDocs(collection(db, 'streams'));
         const streamList = querySnapshot.docs.map(doc => ({
@@ -25,8 +25,21 @@ export default function Recommendation() {
         })) as StreamData[];
 
         if (streamList.length > 0) {
-          const randomIndex = Math.floor(Math.random() * streamList.length);
-          setRecommendedStream(streamList[randomIndex]);
+          // 🌟 1. ID順に並び替えて、リストの順番を全ユーザーで統一する
+          streamList.sort((a, b) => a.id.localeCompare(b.id));
+
+          // 🌟 2. 今日の日付文字列（例: "2024-5-15"）を作成
+          const today = new Date();
+          const dateString = `${today.getFullYear()}-${today.getMonth() + 1}-${today.getDate()}`;
+          
+          // 🌟 3. 日付文字列から計算した数字を使って、1日固定の動画を選ぶ
+          let hash = 0;
+          for (let i = 0; i < dateString.length; i++) {
+            hash = dateString.charCodeAt(i) + ((hash << 5) - hash);
+          }
+          const fixedIndex = Math.abs(hash) % streamList.length;
+          
+          setRecommendedStream(streamList[fixedIndex]);
         }
       } catch (error) {
         console.error("データの取得に失敗しました:", error);
@@ -35,12 +48,11 @@ export default function Recommendation() {
       }
     };
 
-    fetchRandomStream();
+    fetchTodayStream();
   }, []);
 
   return (
     <div className="p-4 relative pb-20">
-      {/* 🌟 シンプルなヘッダーに変更 */}
       <div className="flex items-center mb-6 bg-white p-4 rounded-xl shadow-sm border border-gray-100">
         <Star className="text-gray-500 mr-2" size={24} />
         <h2 className="text-lg font-bold text-gray-800">今日のおすすめ</h2>

@@ -1,7 +1,7 @@
 // src/components/stream/StreamDetailModal.tsx
 import { useState, useEffect } from "react";
 import { useAuth } from "../../contexts/AuthContext";
-import { addWatchRecord } from "../../utils/pointSystem";
+import { addWatchRecord, removeWatchRecord } from "../../utils/pointSystem";
 import { WatchConfirmModal } from "../common/WatchConfirmModal";
 import type { StreamData } from "../../types";
 import type { StreamRecord } from "../../hooks/useUserRecords";
@@ -10,7 +10,7 @@ type Props = {
   stream: StreamData | null;
   record: StreamRecord | null;
   onClose: () => void;
-  onUpdateRecord: (id: string, data: Partial<StreamRecord>) => Promise<void>;
+  onUpdateRecord: (id: string, data: Partial<StreamRecord> & Record<string, any>) => Promise<void>; // 型を少し柔軟に
   isRecommended?: boolean;
 };
 
@@ -19,7 +19,7 @@ export const StreamDetailModal = ({ stream, record, onClose, onUpdateRecord, isR
   const [localMemo, setLocalMemo] = useState("");
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "success">("idle");
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
-  const [actionMode, setActionMode] = useState<'youtube' | 'manual'>('youtube');
+  const [actionMode, setActionMode] = useState<'youtube' | 'increase' | 'decrease'>('youtube');
 
   useEffect(() => {
     setLocalMemo(record?.memo || "");
@@ -33,7 +33,12 @@ export const StreamDetailModal = ({ stream, record, onClose, onUpdateRecord, isR
     
     setSaveStatus("saving");
     try {
-      await onUpdateRecord(stream.id, { memo: localMemo });
+      // 🌟 メモ更新をアクティビティとして認識させるための情報を追加
+      await onUpdateRecord(stream.id, { 
+        memo: localMemo,
+        lastAction: 'memo',
+        updatedAt: new Date().toISOString()
+      });
       setSaveStatus("success");
       setTimeout(() => setSaveStatus("idle"), 2000);
     } catch (error) {
@@ -43,16 +48,15 @@ export const StreamDetailModal = ({ stream, record, onClose, onUpdateRecord, isR
     }
   };
 
-  const handleUpdateViewCount = (delta: number) => {
-    if (typeof onUpdateRecord !== 'function') return;
-    const current = record?.viewCount || 0;
-    onUpdateRecord(stream.id, { viewCount: Math.max(0, current + delta) });
-  };
-
   const toggleFavorite = () => {
     if (typeof onUpdateRecord !== 'function') return;
     const currentFav = record?.isFavorite || false;
-    onUpdateRecord(stream.id, { isFavorite: !currentFav });
+    // 🌟 お気に入り更新をアクティビティとして認識させるための情報を追加
+    onUpdateRecord(stream.id, { 
+      isFavorite: !currentFav,
+      lastAction: 'favorite',
+      updatedAt: new Date().toISOString()
+    });
   };
 
   const handleOpenYoutubeConfirm = () => {
@@ -60,16 +64,27 @@ export const StreamDetailModal = ({ stream, record, onClose, onUpdateRecord, isR
     setIsConfirmOpen(true);
   };
 
-  const handleOpenManualConfirm = () => {
-    setActionMode('manual');
+  const handleOpenIncreaseConfirm = () => {
+    setActionMode('increase');
     setIsConfirmOpen(true);
+  };
+
+  const handleOpenDecreaseConfirm = () => {
+    if ((record?.viewCount || 0) > 0) {
+      setActionMode('decrease');
+      setIsConfirmOpen(true);
+    }
   };
 
   const handleConfirmWatch = async () => {
     setIsConfirmOpen(false);
     if (currentUser) {
       try {
-        await addWatchRecord(currentUser.uid, stream.id, stream.title, isRecommended);
+        if (actionMode === 'decrease') {
+          await removeWatchRecord(currentUser.uid, stream.id, stream.title);
+        } else {
+          await addWatchRecord(currentUser.uid, stream.id, stream.title, isRecommended);
+        }
       } catch (error) {
         console.error("記録に失敗しました", error);
       }
@@ -83,9 +98,7 @@ export const StreamDetailModal = ({ stream, record, onClose, onUpdateRecord, isR
     setIsConfirmOpen(false);
     if (actionMode === 'youtube') {
       window.open(stream.youtubeUrl, "_blank");
-    } else {
-      handleUpdateViewCount(1);
-    }
+    } 
   };
 
   return (
@@ -95,7 +108,6 @@ export const StreamDetailModal = ({ stream, record, onClose, onUpdateRecord, isR
           
           <div className="flex justify-between items-center p-3 border-b border-gray-100">
             <h3 className="font-bold text-gray-800 text-sm truncate flex items-center">
-              {/* 🌟 派手なバッジをやめ、落ち着いたタグに変更 */}
               {isRecommended && (
                 <span className="bg-gray-100 text-gray-600 border border-gray-200 text-[10px] px-2 py-0.5 rounded mr-2">
                   今日のおすすめ
@@ -164,11 +176,11 @@ export const StreamDetailModal = ({ stream, record, onClose, onUpdateRecord, isR
                 </div>
                 
                 <div className="flex items-center border border-gray-300 rounded bg-gray-50 overflow-hidden shadow-sm">
-                  <button onClick={() => handleUpdateViewCount(-1)} className="px-3 py-1 text-gray-600 hover:bg-gray-200">−</button>
+                  <button onClick={handleOpenDecreaseConfirm} className="px-3 py-1 text-gray-600 hover:bg-gray-200">−</button>
                   <span className="px-3 py-1 text-xs text-gray-700 border-x border-gray-300 min-w-[6rem] text-center font-medium bg-white">
                     視聴回数：{record?.viewCount || 0}
                   </span>
-                  <button onClick={handleOpenManualConfirm} className="px-3 py-1 text-gray-600 hover:bg-gray-200">+</button>
+                  <button onClick={handleOpenIncreaseConfirm} className="px-3 py-1 text-gray-600 hover:bg-gray-200">+</button>
                 </div>
               </div>
               

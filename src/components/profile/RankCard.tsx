@@ -32,7 +32,8 @@ export const RankCard = ({ onOpenDashboard }: Props) => {
     >
       <div className="flex justify-between items-start mb-6">
         <div>
-          <h3 className="text-sm font-bold text-gray-600 mb-1 tracking-wider uppercase">Current Rank</h3>
+          {/* 🌟 テキストを HasuLog ランク に変更 */}
+          <h3 className="text-sm font-bold text-gray-600 mb-1 tracking-wider uppercase">HasuLog ランク</h3>
           <div className="flex items-baseline gap-2">
             <span className={`text-4xl font-black ${rankInfo.color} drop-shadow-sm`}>{rankInfo.rank}</span>
             <span className={`text-sm font-bold opacity-70 ${rankInfo.color}`}>Class</span>
