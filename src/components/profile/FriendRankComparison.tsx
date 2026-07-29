@@ -1,70 +1,85 @@
-import type { RankGrade } from '../../types/rank';
-import { RANKS } from '../../constants/rank';
+// src/components/profile/FriendRankComparison.tsx
+import { Trophy } from 'lucide-react';
+import { getRankInfo } from '../../utils/pointSystem';
+import { useUserData } from '../../hooks/useUserData';
+import { useFriends } from '../../hooks/useFriends';
+import { useAuth } from '../../contexts/AuthContext'; // 🌟 追加
 
-export interface FriendStat {
-  id: string;
-  name: string;
-  avatarUrl?: string;
-  monthlyPoints: number;
-  rank: RankGrade;
-}
+export const FriendRankComparison = () => {
+  const { userData } = useUserData();
+  const { friends } = useFriends();
+  const { currentUser } = useAuth(); // 🌟 認証情報から確実に取得する
 
-interface FriendRankComparisonProps {
-  friends: FriendStat[];
-}
+  // 自分とフレンドのデータを結合してランキング化
+  const allUsers = [
+    {
+      id: 'me',
+      // 🌟 userData ではなく currentUser から名前と写真を取得
+      name: currentUser?.displayName || 'あなた',
+      monthlyPoints: userData?.monthlyPoints || 0,
+      photoURL: currentUser?.photoURL,
+      isMe: true
+    },
+    ...friends.map(f => ({
+      id: f.uid,
+      name: f.displayName,
+      monthlyPoints: f.monthlyPoints,
+      photoURL: f.photoURL,
+      isMe: false
+    }))
+  ];
 
-export const FriendRankComparison = ({ friends }: FriendRankComparisonProps) => {
-  // ポイントが高い順に並び替え
-  const sortedFriends = [...friends].sort((a, b) => b.monthlyPoints - a.monthlyPoints);
+  // ポイントが多い順にソート
+  const sortedUsers = allUsers.sort((a, b) => b.monthlyPoints - a.monthlyPoints);
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
-      <h3 className="text-lg font-black text-gray-800 mb-5 flex items-center gap-2">
-        🏆 フレンドランキング
+    <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm h-full flex flex-col min-h-[300px]">
+      <h3 className="text-sm font-bold text-gray-800 mb-4 flex items-center">
+        <Trophy className="w-4 h-4 mr-2 text-yellow-500" />
+        フレンドランキング (今月)
       </h3>
-      <ul className="space-y-3">
-        {sortedFriends.length === 0 ? (
-          <p className="text-gray-400 text-sm py-4 text-center">フレンドがいません</p>
-        ) : (
-          sortedFriends.map((friend, index) => {
-            const rankInfo = RANKS[friend.rank];
-            const isTop3 = index < 3;
-            
-            return (
-              <li key={friend.id} className="flex items-center justify-between p-3 bg-gray-50 hover:bg-gray-100 rounded-xl transition-colors border border-gray-100">
-                <div className="flex items-center gap-4">
-                  {/* 順位 */}
-                  <span className={`w-6 text-center font-black ${isTop3 ? 'text-gray-800' : 'text-gray-400'}`}>
-                    {index + 1}
-                  </span>
-                  
-                  {/* アイコン */}
-                  <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden border border-gray-300">
-                    {friend.avatarUrl ? (
-                      <img src={friend.avatarUrl} alt={friend.name} className="w-full h-full object-cover" />
-                    ) : (
-                      <span className="text-gray-500 font-bold">{friend.name[0]}</span>
-                    )}
-                  </div>
-                  
-                  {/* 名前とポイント */}
-                  <div>
-                    <p className="font-bold text-gray-800 text-sm">{friend.name}</p>
-                    <p className="text-xs font-bold text-gray-500 mt-0.5">
-                      {friend.monthlyPoints.toLocaleString()} pt
-                    </p>
-                  </div>
+
+      <div className="space-y-3 flex-grow overflow-y-auto custom-scrollbar pr-2">
+        {sortedUsers.map((user, index) => {
+          const rankInfo = getRankInfo(user.monthlyPoints);
+          return (
+            <div 
+              key={user.id} 
+              className={`flex items-center justify-between p-3 rounded-lg border ${
+                user.isMe ? 'border-blue-200 bg-blue-50/50' : 'border-gray-100 bg-gray-50'
+              }`}
+            >
+              <div className="flex items-center gap-3 overflow-hidden">
+                <div className={`w-6 h-6 flex items-center justify-center rounded-full text-xs font-black flex-shrink-0 ${
+                  index === 0 ? 'bg-yellow-100 text-yellow-700' :
+                  index === 1 ? 'bg-gray-200 text-gray-700' :
+                  index === 2 ? 'bg-orange-100 text-orange-800' :
+                  'bg-gray-100 text-gray-500'
+                }`}>
+                  {index + 1}
                 </div>
                 
-                {/* ランクバッジ */}
-                <div className={`px-4 py-1.5 rounded-full font-black text-xs ${rankInfo.badgeBg}`}>
-                  {rankInfo.name}
+                {user.photoURL ? (
+                  <img src={user.photoURL} alt={user.name} className="w-8 h-8 rounded-full object-cover border border-gray-200 flex-shrink-0" />
+                ) : (
+                  <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-gray-500 font-bold text-xs flex-shrink-0">
+                    {user.name.charAt(0)}
+                  </div>
+                )}
+                
+                <div className="truncate">
+                  <p className="text-sm font-bold text-gray-700 truncate">{user.name}</p>
+                  <p className="text-[10px] text-gray-500 font-medium">{user.monthlyPoints.toLocaleString()} pt</p>
                 </div>
-              </li>
-            );
-          })
-        )}
-      </ul>
+              </div>
+
+              <div className="flex flex-col items-end flex-shrink-0 ml-2">
+                <span className={`text-lg font-black ${rankInfo.color}`}>{rankInfo.rank}</span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 };

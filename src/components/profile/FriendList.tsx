@@ -1,13 +1,13 @@
 // src/components/profile/FriendList.tsx
 import { useState } from 'react';
-import { Users, Search, UserPlus, User } from 'lucide-react';
+import { Users, Search, UserPlus, User, Trash2 } from 'lucide-react';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { useAuth } from '../../contexts/AuthContext';
+import { useFriends } from '../../hooks/useFriends'; // 🌟 フックをインポート
 
 type TabType = 'list' | 'add' | 'requests';
 
-// 🌟 親コンポーネントから受け取るPropsの型を定義
 interface FriendListProps {
   friendId: string;
 }
@@ -17,22 +17,23 @@ interface SearchResult {
   displayName: string;
   photoURL?: string;
   oshiMember?: string;
+  friendId?: string; // 🌟 検索結果からフレンド追加するために追加
 }
 
-// 🌟 Propsとして friendId を受け取る
 export default function FriendList({ friendId }: FriendListProps) {
   const { currentUser } = useAuth();
+  // 🌟 useFriends から実際のデータを取得
+  const { friends, addFriend, removeFriend, error: hookError } = useFriends();
+  
   const [activeTab, setActiveTab] = useState<TabType>('list');
   const [searchQuery, setSearchQuery] = useState('');
   
-  // 検索状態の管理
   const [isSearching, setIsSearching] = useState(false);
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [searchMessage, setSearchMessage] = useState('');
 
-  // 📝 今後のステップで連携するデータ
-  const friends: any[] = [];
-  const requests: any[] = [];
+  // 承認待ちリスト（今回はダミーのまま）
+  const requests: any[] = []; 
 
   // ユーザー検索処理
   const handleSearch = async (e: React.FormEvent) => {
@@ -45,7 +46,6 @@ export default function FriendList({ friendId }: FriendListProps) {
 
     try {
       const usersRef = collection(db, 'users');
-      // 8桁の数字かどうかを判定する正規表現
       const isIdSearch = /^\d{8}$/.test(searchQuery.trim());
       
       const q = isIdSearch 
@@ -65,6 +65,7 @@ export default function FriendList({ friendId }: FriendListProps) {
               displayName: doc.data().displayName || '名無しさん',
               photoURL: doc.data().photoURL,
               oshiMember: doc.data().oshiMember,
+              friendId: doc.data().friendId, // 🌟 データベースからfriendIdも取得
             });
           }
         });
@@ -83,13 +84,25 @@ export default function FriendList({ friendId }: FriendListProps) {
     }
   };
 
-  const sendFriendRequest = (targetUid: string) => {
-    console.log("申請送信先UID:", targetUid);
-    alert("フレンド申請処理は次回実装します！");
+  // 🌟 フレンド追加処理（フックを呼び出す）
+  const handleAddFriend = async (targetFriendId?: string) => {
+    if (!targetFriendId) {
+      alert("IDが取得できませんでした。");
+      return;
+    }
+    const success = await addFriend(targetFriendId);
+    if (success) {
+      alert("フレンドを追加しました！");
+      setSearchQuery('');
+      setSearchResults([]);
+      setActiveTab('list'); // 追加成功したら一覧タブに戻す
+    } else {
+      alert("追加に失敗しました。既にフレンドの可能性があります。");
+    }
   };
 
   return (
-    <div className="bg-white rounded-xl shadow-sm p-5 mb-5 border border-gray-100">
+    <div className="bg-white rounded-xl shadow-sm p-5 mb-5 border border-gray-100 h-full flex flex-col">
       <div className="flex items-center mb-4 text-gray-800 border-b border-gray-100 pb-2">
         <Users size={20} className="mr-2 text-gray-600" />
         <h3 className="font-bold">フレンド</h3>
@@ -119,92 +132,134 @@ export default function FriendList({ friendId }: FriendListProps) {
         </button>
       </div>
 
-      {activeTab === 'list' && (
-        <div className="space-y-3">
-          {friends.length === 0 ? (
-            <div className="text-center py-6 text-sm text-gray-500">
-              まだフレンドがいません。
-            </div>
-          ) : (
-            <div>フレンドリストを表示します</div>
-          )}
-        </div>
-      )}
-
-      {activeTab === 'add' && (
-        <div>
-          <form onSubmit={handleSearch} className="flex gap-2 mb-4">
-            <input 
-              type="text" 
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="8桁のID または 表示名" 
-              className="flex-1 border border-gray-300 rounded-lg p-2 text-sm focus:border-blue-400 focus:ring-1 focus:ring-blue-400 outline-none"
-            />
-            <button 
-              type="submit" 
-              disabled={isSearching || !searchQuery.trim()}
-              className="bg-gray-800 hover:bg-gray-700 disabled:bg-gray-400 text-white px-3 py-2 rounded-lg transition-colors flex items-center justify-center"
-            >
-              {isSearching ? <span className="animate-spin text-sm">⏳</span> : <Search size={16} />}
-            </button>
-          </form>
-
-          {searchMessage && (
-            <p className="text-sm text-red-500 mb-4 text-center">{searchMessage}</p>
-          )}
-
-          {searchResults.length > 0 && (
-            <div className="mb-6 space-y-3">
-              <p className="text-xs font-bold text-gray-500">検索結果</p>
-              {searchResults.map(user => (
-                <div key={user.uid} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200">
-                  <div className="flex items-center gap-3 overflow-hidden">
-                    <div className="w-10 h-10 bg-pink-100 rounded-full flex items-center justify-center text-pink-600 font-bold flex-shrink-0">
-                      {user.photoURL ? (
-                        <img src={user.photoURL} alt="" className="w-full h-full rounded-full object-cover" />
-                      ) : (
-                        <User size={20} />
-                      )}
+      <div className="flex-grow overflow-y-auto custom-scrollbar -mx-2 px-2">
+        {activeTab === 'list' && (
+          <div className="space-y-3 pb-4">
+            {friends.length === 0 ? (
+              <div className="text-center py-6 text-sm text-gray-500">
+                まだフレンドがいません。
+              </div>
+            ) : (
+              // 🌟 実際のフレンドリストを描画
+              <div className="space-y-2">
+                {friends.map(friend => (
+                  <div key={friend.uid} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200 group transition-colors hover:bg-gray-100">
+                    <div className="flex items-center gap-3 overflow-hidden">
+                      <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-bold flex-shrink-0 overflow-hidden border border-gray-200">
+                        {friend.photoURL ? (
+                          <img src={friend.photoURL} alt="" className="w-full h-full object-cover" />
+                        ) : (
+                          <User size={20} />
+                        )}
+                      </div>
+                      <div className="truncate">
+                        <p className="font-bold text-gray-800 text-sm truncate">{friend.displayName}</p>
+                      </div>
                     </div>
-                    <div className="truncate">
-                      <p className="font-bold text-gray-800 text-sm truncate">{user.displayName}</p>
-                      {user.oshiMember && <p className="text-xs text-pink-500 truncate">推し: {user.oshiMember}</p>}
-                    </div>
+                    <button 
+                      onClick={() => {
+                        if (window.confirm(`${friend.displayName}さんをフレンドから削除しますか？`)) {
+                          removeFriend(friend.uid);
+                        }
+                      }}
+                      className="ml-2 p-2 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-md transition-colors opacity-0 group-hover:opacity-100"
+                      title="フレンド解除"
+                    >
+                      <Trash2 size={18} />
+                    </button>
                   </div>
-                  <button 
-                    onClick={() => sendFriendRequest(user.uid)}
-                    className="ml-2 flex items-center justify-center gap-1 bg-blue-500 hover:bg-blue-600 text-white text-xs font-bold py-1.5 px-3 rounded-md transition-colors"
-                  >
-                    <UserPlus size={14} />
-                    申請
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-          
-          <div className="bg-blue-50 p-3 rounded-lg border border-blue-100 mt-auto">
-            <p className="text-xs text-blue-600 font-bold mb-1">あなたのフレンドID</p>
-            <div className="flex justify-between items-center bg-white border border-blue-200 p-2 rounded text-lg font-mono font-bold text-gray-700 tracking-wider text-center">
-              {/* 🌟 親から受け取ったIDを表示 */}
-              {friendId || "取得中..."}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
-        </div>
-      )}
+        )}
 
-      {activeTab === 'requests' && (
-        <div className="space-y-3">
-          {requests.length === 0 ? (
-            <div className="text-center py-6 text-sm text-gray-500">
-              承認待ちのフレンドリクエストはありません。
-            </div>
-          ) : (
-            <div>リクエストリストを表示します</div>
-          )}
+        {activeTab === 'add' && (
+          <div className="pb-4">
+            <form onSubmit={handleSearch} className="flex gap-2 mb-4">
+              <input 
+                type="text" 
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="8桁のID または 表示名" 
+                className="flex-1 border border-gray-300 rounded-lg p-2 text-sm focus:border-blue-400 focus:ring-1 focus:ring-blue-400 outline-none"
+              />
+              <button 
+                type="submit" 
+                disabled={isSearching || !searchQuery.trim()}
+                className="bg-gray-800 hover:bg-gray-700 disabled:bg-gray-400 text-white px-3 py-2 rounded-lg transition-colors flex items-center justify-center min-w-[48px]"
+              >
+                {isSearching ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Search size={16} />}
+              </button>
+            </form>
+
+            {searchMessage && (
+              <p className="text-sm text-red-500 mb-4 text-center">{searchMessage}</p>
+            )}
+            {hookError && (
+              <p className="text-sm text-red-500 mb-4 text-center">{hookError}</p>
+            )}
+
+            {searchResults.length > 0 && (
+              <div className="mb-6 space-y-3">
+                <p className="text-xs font-bold text-gray-500">検索結果</p>
+                {searchResults.map(user => (
+                  <div key={user.uid} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200">
+                    <div className="flex items-center gap-3 overflow-hidden">
+                      <div className="w-10 h-10 bg-pink-100 rounded-full flex items-center justify-center text-pink-600 font-bold flex-shrink-0 overflow-hidden">
+                        {user.photoURL ? (
+                          <img src={user.photoURL} alt="" className="w-full h-full object-cover" />
+                        ) : (
+                          <User size={20} />
+                        )}
+                      </div>
+                      <div className="truncate">
+                        <p className="font-bold text-gray-800 text-sm truncate">{user.displayName}</p>
+                        {user.oshiMember && <p className="text-xs text-pink-500 truncate">推し: {user.oshiMember}</p>}
+                      </div>
+                    </div>
+                    {/* 🌟 ダミーの申請関数から実際に追加する関数へ変更 */}
+                    <button 
+                      onClick={() => handleAddFriend(user.friendId)}
+                      className="ml-2 flex items-center justify-center gap-1 bg-blue-500 hover:bg-blue-600 text-white text-xs font-bold py-1.5 px-3 rounded-md transition-colors flex-shrink-0"
+                    >
+                      <UserPlus size={14} />
+                      追加
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'requests' && (
+          <div className="space-y-3 pb-4">
+            {requests.length === 0 ? (
+              <div className="text-center py-6 text-sm text-gray-500">
+                承認待ちのフレンドリクエストはありません。
+              </div>
+            ) : (
+              <div>リクエストリストを表示します</div>
+            )}
+          </div>
+        )}
+      </div>
+      
+      {/* 🌟 コピーしやすいように自分のIDを一番下に固定配置 */}
+      <div className="bg-blue-50 p-3 rounded-lg border border-blue-100 mt-auto flex-shrink-0">
+        <p className="text-xs text-blue-600 font-bold mb-1">あなたのフレンドID</p>
+        <div 
+          className="flex justify-between items-center bg-white border border-blue-200 p-2 rounded text-lg font-mono font-bold text-gray-700 tracking-wider text-center cursor-pointer hover:bg-blue-50/50 transition-colors"
+          onClick={() => {
+            navigator.clipboard.writeText(friendId);
+            alert("フレンドIDをコピーしました！");
+          }}
+          title="クリックしてコピー"
+        >
+          {friendId || "取得中..."}
         </div>
-      )}
+      </div>
     </div>
   );
 }

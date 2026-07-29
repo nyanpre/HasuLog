@@ -2,13 +2,13 @@
 import { signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
 import { auth } from './firebase';
 import { useAuth } from './contexts/AuthContext';
-// 🌟 Navigate を追加インポート
 import { Routes, Route, Navigate } from 'react-router-dom';
 
-import Layout from './components/Layout';
-import { StreamList } from './components/StreamList';
+import Layout from './components/common/Layout';
+import { StreamList } from './components/stream/StreamList';
 import Profile from './components/pages/Profile';
 import { History } from './components/pages/History';
+import Timeline from './components/pages/Timeline';
 
 export default function App() {
   const { currentUser, loading } = useAuth();
@@ -37,6 +37,7 @@ export default function App() {
           <Route path="/" element={<StreamList />} />
           <Route path="/history" element={<History />} />
           <Route path="/profile" element={<Profile />} />
+          <Route path="/timeline" element={<Timeline />} />
           
           {/* 🌟 追加：上記以外のURLで開かれた場合、強制的にホーム(/)へリダイレクト */}
           <Route path="*" element={<Navigate to="/" replace />} />
