@@ -80,13 +80,6 @@ export const StreamList = () => {
     fetchStreams();
   }, []);
 
-  const updateViewCount = (id: string, delta: number, e?: React.MouseEvent) => {
-    if (e) e.stopPropagation();
-    const current = records[id]?.viewCount || 0;
-    const next = Math.max(0, current + delta);
-    updateRecord(id, { viewCount: next });
-  };
-
   const getViewCount = (id: string) => records[id]?.viewCount || 0;
 
   const setMemberFilter = (member: string, state: FilterState) => {
@@ -222,7 +215,6 @@ export const StreamList = () => {
             columns={columns}
             viewCount={getViewCount(stream.id)}
             onClick={() => setSelectedStream(stream)}
-            onUpdateViewCount={(delta, e) => updateViewCount(stream.id, delta, e)}
           />
         ))}
       </div>
