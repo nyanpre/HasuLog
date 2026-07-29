@@ -18,8 +18,9 @@ export const StreamDetailModal = ({ stream, record, onClose, onUpdateRecord }: P
   const [localMemo, setLocalMemo] = useState("");
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "success">("idle");
   
-  // 🌟 確認モーダルの開閉ステート
+  // 🌟 確認モーダルの開閉と、アクションの種類を管理するステート
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+  const [actionMode, setActionMode] = useState<'youtube' | 'manual'>('youtube');
 
   useEffect(() => {
     setLocalMemo(record?.memo || "");
@@ -55,24 +56,44 @@ export const StreamDetailModal = ({ stream, record, onClose, onUpdateRecord }: P
     onUpdateRecord(stream.id, { isFavorite: !currentFav });
   };
 
-  // 🌟 [はい] を押した時の処理（ポイント付与 ＋ 視聴回数+1 ＋ YouTube開く）
+  // 🌟 YouTubeで開くボタンを押した時
+  const handleOpenYoutubeConfirm = () => {
+    setActionMode('youtube');
+    setIsConfirmOpen(true);
+  };
+
+  // 🌟 +ボタン（手動）を押した時
+  const handleOpenManualConfirm = () => {
+    setActionMode('manual');
+    setIsConfirmOpen(true);
+  };
+
+  // 🌟 [はい（ポイント獲得）] を押した時の処理
   const handleConfirmWatch = async () => {
     setIsConfirmOpen(false);
     if (currentUser) {
       try {
         await addWatchRecord(currentUser.uid, stream.id, stream.title);
-        handleUpdateViewCount(1); // ついでに視聴回数も自動で増やす
+        // addWatchRecord 内で viewCount は +1 され、onSnapshot 経由で画面に自動反映されます
       } catch (error) {
         console.error("記録に失敗しました", error);
       }
     }
-    window.open(stream.youtubeUrl, "_blank");
+    // YouTubeボタン経由だった場合のみ別タブで開く
+    if (actionMode === 'youtube') {
+      window.open(stream.youtubeUrl, "_blank");
+    }
   };
 
-  // 🌟 [いいえ] を押した時の処理（そのままYouTube開く）
+  // 🌟 [いいえ（動画を見るだけ / 回数のみ追加）] を押した時の処理
   const handleSkipWatch = () => {
     setIsConfirmOpen(false);
-    window.open(stream.youtubeUrl, "_blank");
+    if (actionMode === 'youtube') {
+      window.open(stream.youtubeUrl, "_blank");
+    } else {
+      // 手動追加（ポイントなし）の場合は回数のみ +1
+      handleUpdateViewCount(1);
+    }
   };
 
   return (
@@ -119,10 +140,10 @@ export const StreamDetailModal = ({ stream, record, onClose, onUpdateRecord }: P
               </p>
             </div>
 
-            {/* 🌟 aタグからbuttonタグに変更し、onClickでモーダルを開く */}
+            {/* 🌟 onClick の対象を handleOpenYoutubeConfirm に変更 */}
             {stream.youtubeUrl && (
               <button 
-                onClick={() => setIsConfirmOpen(true)}
+                onClick={handleOpenYoutubeConfirm}
                 className="flex items-center justify-center w-full bg-red-600 hover:bg-red-700 text-white font-bold py-2.5 px-4 rounded-lg mb-6 shadow-sm text-sm transition-colors active:scale-[0.98]"
               >
                 <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 24 24">
@@ -148,7 +169,8 @@ export const StreamDetailModal = ({ stream, record, onClose, onUpdateRecord }: P
                   <span className="px-3 py-1 text-xs text-gray-700 border-x border-gray-300 min-w-[6rem] text-center font-medium bg-white">
                     視聴回数：{record?.viewCount || 0}
                   </span>
-                  <button onClick={() => handleUpdateViewCount(1)} className="px-3 py-1 text-gray-600 hover:bg-gray-200">+</button>
+                  {/* 🌟 onClick の対象を handleOpenManualConfirm に変更 */}
+                  <button onClick={handleOpenManualConfirm} className="px-3 py-1 text-gray-600 hover:bg-gray-200">+</button>
                 </div>
               </div>
               
@@ -188,6 +210,7 @@ export const StreamDetailModal = ({ stream, record, onClose, onUpdateRecord }: P
       <WatchConfirmModal
         isOpen={isConfirmOpen}
         videoTitle={stream.title}
+        actionType={actionMode} // 🌟 'youtube' か 'manual' かを渡す
         onClose={() => setIsConfirmOpen(false)}
         onConfirm={handleConfirmWatch}
         onSkip={handleSkipWatch}

@@ -4,9 +4,11 @@ import { collection, doc, setDoc, onSnapshot } from "firebase/firestore";
 import { db, auth } from "../firebase";
 
 export interface StreamRecord {
+  streamId?: string; // pointSystem.tsで追加されるため念のため定義
+  streamTitle?: string; // pointSystem.tsで追加されるため念のため定義
   viewCount: number;
   memo: string;
-  isFavorite?: boolean; // 🌟 お気に入りフラグを追加
+  isFavorite?: boolean;
   lastViewedAt: string;
   updatedAt: string;
 }
@@ -20,7 +22,8 @@ export const useUserRecords = () => {
         setRecords({});
         return;
       }
-      const recordsRef = collection(db, "users", user.uid, "streamRecords");
+      // 🌟 Firestoreの保存先を "streamRecords" から新しいスキーマの "watchHistory" に変更
+      const recordsRef = collection(db, "users", user.uid, "watchHistory");
       const unsubscribeDocs = onSnapshot(recordsRef, (snapshot) => {
         const newRecords: Record<string, StreamRecord> = {};
         snapshot.forEach(doc => {
@@ -34,7 +37,6 @@ export const useUserRecords = () => {
     return () => unsubscribeAuth();
   }, []);
 
-  // 🌟 非同期関数としてPromiseを返す
   const updateRecord = async (streamId: string, data: Partial<StreamRecord>) => {
     const user = auth.currentUser;
     if (!user) {
@@ -43,7 +45,8 @@ export const useUserRecords = () => {
     }
     
     const now = new Date().toISOString();
-    const ref = doc(db, "users", user.uid, "streamRecords", streamId);
+    // 🌟 こちらの参照先も "watchHistory" に変更
+    const ref = doc(db, "users", user.uid, "watchHistory", streamId);
     const isViewUpdate = data.viewCount !== undefined;
     
     await setDoc(ref, {

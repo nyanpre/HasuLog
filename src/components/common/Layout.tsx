@@ -1,6 +1,6 @@
 // src/components/Layout.tsx
 import { Outlet, Link } from "react-router-dom";
-import { Home, History, User } from "lucide-react";
+import { Home, History, Clock, User } from "lucide-react"; // 🌟 Clockを追加
 import { type ReactNode } from "react";
 
 // children をオプショナル（?）で受け取れるように型を定義
@@ -33,6 +33,11 @@ export default function Layout({ children }: LayoutProps) {
           <Link to="/history" className="flex flex-col items-center text-gray-500 hover:text-pink-500">
             <History size={24} />
             <span className="text-[10px] mt-1">履歴</span>
+          </Link>
+          {/* 🌟 タイムラインのメニューを追加 */}
+          <Link to="/timeline" className="flex flex-col items-center text-gray-500 hover:text-pink-500">
+            <Clock size={24} />
+            <span className="text-[10px] mt-1">タイムライン</span>
           </Link>
           <Link to="/profile" className="flex flex-col items-center text-gray-500 hover:text-pink-500">
             <User size={24} />

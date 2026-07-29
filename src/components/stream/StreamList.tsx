@@ -2,13 +2,13 @@
 
 import { useEffect, useState, useMemo } from "react";
 import { collection, getDocs, query, orderBy } from "firebase/firestore";
-import { db } from "../firebase";
-import type { StreamData } from "../types";
+import { db } from "../../firebase";
+import type { StreamData } from "../../types";
 
-import { useUserRecords } from "../hooks/useUserRecords";
-import { StreamCard } from "./stream/StreamCard";
-import { MemberFilterModal, type FilterState } from "./stream/MemberFilterModal";
-import { StreamDetailModal } from "./stream/StreamDetailModal";
+import { useUserRecords } from "../../hooks/useUserRecords";
+import { StreamCard } from "./StreamCard";
+import { MemberFilterModal, type FilterState } from "./MemberFilterModal";
+import { StreamDetailModal } from "./StreamDetailModal";
 
 const MEMBERS = [
   "花帆", "さやか", "瑠璃乃", "梢", "綴理", "慈", 

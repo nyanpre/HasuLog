@@ -1,15 +1,16 @@
 // src/components/common/WatchConfirmModal.tsx
-import { PlayCircle, ExternalLink, X } from 'lucide-react';
+import { PlayCircle, ExternalLink, PlusCircle, X } from 'lucide-react';
 
 interface WatchConfirmModalProps {
   isOpen: boolean;
   videoTitle: string;
+  actionType: 'youtube' | 'manual'; // 🌟 どっちのアクションか判定
   onClose: () => void;
   onConfirm: () => void;
   onSkip: () => void;
 }
 
-export const WatchConfirmModal = ({ isOpen, videoTitle, onClose, onConfirm, onSkip }: WatchConfirmModalProps) => {
+export const WatchConfirmModal = ({ isOpen, videoTitle, actionType, onClose, onConfirm, onSkip }: WatchConfirmModalProps) => {
   if (!isOpen) return null;
 
   return (
@@ -24,13 +25,15 @@ export const WatchConfirmModal = ({ isOpen, videoTitle, onClose, onConfirm, onSk
         </div>
 
         <div className="p-6">
-          <p className="text-sm text-gray-600 mb-2">以下の動画を開きます：</p>
+          <p className="text-sm text-gray-600 mb-2">
+            {actionType === 'youtube' ? '以下の動画を開きます：' : '以下の動画の視聴回数を追加します：'}
+          </p>
           <p className="font-bold text-gray-800 mb-6 bg-gray-50 p-3 rounded-lg border border-gray-100 line-clamp-2">
             {videoTitle}
           </p>
 
           <p className="text-sm font-bold text-gray-700 mb-4 text-center">
-            この動画の視聴を HasuLog に記録しますか？
+            この視聴を HasuLog に記録しますか？
           </p>
 
           <div className="flex flex-col gap-3">
@@ -38,7 +41,7 @@ export const WatchConfirmModal = ({ isOpen, videoTitle, onClose, onConfirm, onSk
               onClick={onConfirm}
               className="w-full flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3.5 px-4 rounded-xl transition-all shadow-sm active:scale-[0.98]"
             >
-              <PlayCircle size={20} />
+              {actionType === 'youtube' ? <PlayCircle size={20} /> : <PlusCircle size={20} />}
               はい（記録して +100pt 獲得）
             </button>
 
@@ -47,7 +50,7 @@ export const WatchConfirmModal = ({ isOpen, videoTitle, onClose, onConfirm, onSk
               className="w-full flex items-center justify-center gap-2 bg-white border-2 border-gray-200 hover:bg-gray-50 text-gray-600 font-bold py-3 px-4 rounded-xl transition-all active:scale-[0.98]"
             >
               <ExternalLink size={18} className="text-gray-400" />
-              いいえ（動画を確認するだけ）
+              {actionType === 'youtube' ? 'いいえ（動画を確認するだけ）' : 'いいえ（ポイントなしで回数のみ追加）'}
             </button>
           </div>
         </div>
