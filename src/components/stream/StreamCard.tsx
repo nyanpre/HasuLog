@@ -10,25 +10,23 @@ type Props = {
   columns: 1 | 2 | 4;
   viewCount: number;
   onClick: () => void;
-  onUpdateViewCount: (delta: number, e?: React.MouseEvent) => void;
+  // 🌟 不要になった onUpdateViewCount を削除しました
 };
 
-export const StreamCard = ({ stream, columns, viewCount, onClick, onUpdateViewCount }: Props) => {
+// 🌟 受け取る引数からも onUpdateViewCount を削除しました
+export const StreamCard = ({ stream, columns, viewCount, onClick }: Props) => {
   const { currentUser } = useAuth();
   
-  // 🌟 カード側にもポップアップ用の状態を追加
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [actionMode, setActionMode] = useState<'increase' | 'decrease'>('increase');
 
-  // 🌟 プラス・マイナスが押された時にポップアップを開く
   const handleOpenConfirm = (mode: 'increase' | 'decrease', e: React.MouseEvent) => {
-    e.stopPropagation(); // カード自体のクリック（詳細を開く）を防ぐ
+    e.stopPropagation(); 
     if (mode === 'decrease' && viewCount === 0) return;
     setActionMode(mode);
     setIsConfirmOpen(true);
   };
 
-  // 🌟 ポップアップで「はい」が押された時
   const handleConfirm = async () => {
     setIsConfirmOpen(false);
     if (currentUser) {
@@ -93,7 +91,6 @@ export const StreamCard = ({ stream, columns, viewCount, onClick, onUpdateViewCo
 
         <div className={`${columns === 1 ? "mt-3" : "mt-2"} flex items-center`}>
           <div className="flex items-center border border-gray-300 rounded bg-gray-50 overflow-hidden shadow-sm">
-            {/* 🌟 マイナスボタン */}
             <button 
               onClick={(e) => handleOpenConfirm('decrease', e)}
               className="px-2.5 py-0.5 sm:py-1 text-gray-600 hover:bg-gray-200 transition-colors"
@@ -101,7 +98,6 @@ export const StreamCard = ({ stream, columns, viewCount, onClick, onUpdateViewCo
             <span className="px-2 py-0.5 sm:py-1 text-[10px] sm:text-xs text-gray-700 border-x border-gray-300 min-w-[5.5rem] text-center font-medium bg-white">
               視聴回数：{viewCount}
             </span>
-            {/* 🌟 プラスボタン */}
             <button 
               onClick={(e) => handleOpenConfirm('increase', e)}
               className="px-2.5 py-0.5 sm:py-1 text-gray-600 hover:bg-gray-200 transition-colors"
@@ -110,7 +106,6 @@ export const StreamCard = ({ stream, columns, viewCount, onClick, onUpdateViewCo
         </div>
       </div>
 
-      {/* 🌟 ポップアップを開いた時にカード自体がクリックされるのを防ぐ枠で囲む */}
       {isConfirmOpen && (
         <div onClick={(e) => e.stopPropagation()}>
           <WatchConfirmModal

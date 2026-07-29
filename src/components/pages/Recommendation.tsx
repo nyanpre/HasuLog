@@ -69,11 +69,6 @@ export default function Recommendation() {
             columns={1}
             viewCount={records[recommendedStream.id]?.viewCount || 0}
             onClick={() => setSelectedStream(recommendedStream)} 
-            onUpdateViewCount={(delta, e) => {
-              e?.stopPropagation();
-              const current = records[recommendedStream.id]?.viewCount || 0;
-              updateRecord(recommendedStream.id, { viewCount: Math.max(0, current + delta) });
-            }}
           />
         </div>
       ) : (

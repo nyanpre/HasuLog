@@ -99,11 +99,7 @@ export default function Home() {
                 columns={layout}
                 viewCount={currentViewCount}
                 onClick={() => setSelectedStream(stream)} 
-                onUpdateViewCount={(delta, e) => {
-                  e?.stopPropagation(); // カード全体のモーダルが開かないようにする
-                  const newCount = Math.max(0, currentViewCount + delta);
-                  updateRecord(stream.id, { viewCount: newCount });
-                }}
+                /* 🌟 不要になった onUpdateViewCount をここから削除しました！ */
               />
             );
           })}
