@@ -11,14 +11,13 @@ type Props = {
   record: StreamRecord | null;
   onClose: () => void;
   onUpdateRecord: (id: string, data: Partial<StreamRecord>) => Promise<void>;
+  isRecommended?: boolean;
 };
 
-export const StreamDetailModal = ({ stream, record, onClose, onUpdateRecord }: Props) => {
+export const StreamDetailModal = ({ stream, record, onClose, onUpdateRecord, isRecommended = false }: Props) => {
   const { currentUser } = useAuth();
   const [localMemo, setLocalMemo] = useState("");
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "success">("idle");
-  
-  // 🌟 確認モーダルの開閉と、アクションの種類を管理するステート
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [actionMode, setActionMode] = useState<'youtube' | 'manual'>('youtube');
 
@@ -56,42 +55,35 @@ export const StreamDetailModal = ({ stream, record, onClose, onUpdateRecord }: P
     onUpdateRecord(stream.id, { isFavorite: !currentFav });
   };
 
-  // 🌟 YouTubeで開くボタンを押した時
   const handleOpenYoutubeConfirm = () => {
     setActionMode('youtube');
     setIsConfirmOpen(true);
   };
 
-  // 🌟 +ボタン（手動）を押した時
   const handleOpenManualConfirm = () => {
     setActionMode('manual');
     setIsConfirmOpen(true);
   };
 
-  // 🌟 [はい（ポイント獲得）] を押した時の処理
   const handleConfirmWatch = async () => {
     setIsConfirmOpen(false);
     if (currentUser) {
       try {
-        await addWatchRecord(currentUser.uid, stream.id, stream.title);
-        // addWatchRecord 内で viewCount は +1 され、onSnapshot 経由で画面に自動反映されます
+        await addWatchRecord(currentUser.uid, stream.id, stream.title, isRecommended);
       } catch (error) {
         console.error("記録に失敗しました", error);
       }
     }
-    // YouTubeボタン経由だった場合のみ別タブで開く
     if (actionMode === 'youtube') {
       window.open(stream.youtubeUrl, "_blank");
     }
   };
 
-  // 🌟 [いいえ（動画を見るだけ / 回数のみ追加）] を押した時の処理
   const handleSkipWatch = () => {
     setIsConfirmOpen(false);
     if (actionMode === 'youtube') {
       window.open(stream.youtubeUrl, "_blank");
     } else {
-      // 手動追加（ポイントなし）の場合は回数のみ +1
       handleUpdateViewCount(1);
     }
   };
@@ -102,7 +94,15 @@ export const StreamDetailModal = ({ stream, record, onClose, onUpdateRecord }: P
         <div className="bg-white w-full max-w-2xl sm:rounded-xl shadow-2xl flex flex-col max-h-[90vh] sm:max-h-[85vh] animate-slide-up sm:animate-fade-in">
           
           <div className="flex justify-between items-center p-3 border-b border-gray-100">
-            <h3 className="font-bold text-gray-800 text-sm truncate">【 動画詳細 】</h3>
+            <h3 className="font-bold text-gray-800 text-sm truncate flex items-center">
+              {/* 🌟 派手なバッジをやめ、落ち着いたタグに変更 */}
+              {isRecommended && (
+                <span className="bg-gray-100 text-gray-600 border border-gray-200 text-[10px] px-2 py-0.5 rounded mr-2">
+                  今日のおすすめ
+                </span>
+              )}
+              【 動画詳細 】
+            </h3>
             <button onClick={onClose} className="w-7 h-7 flex-shrink-0 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200 text-gray-600">✕</button>
           </div>
 
@@ -140,7 +140,6 @@ export const StreamDetailModal = ({ stream, record, onClose, onUpdateRecord }: P
               </p>
             </div>
 
-            {/* 🌟 onClick の対象を handleOpenYoutubeConfirm に変更 */}
             {stream.youtubeUrl && (
               <button 
                 onClick={handleOpenYoutubeConfirm}
@@ -169,7 +168,6 @@ export const StreamDetailModal = ({ stream, record, onClose, onUpdateRecord }: P
                   <span className="px-3 py-1 text-xs text-gray-700 border-x border-gray-300 min-w-[6rem] text-center font-medium bg-white">
                     視聴回数：{record?.viewCount || 0}
                   </span>
-                  {/* 🌟 onClick の対象を handleOpenManualConfirm に変更 */}
                   <button onClick={handleOpenManualConfirm} className="px-3 py-1 text-gray-600 hover:bg-gray-200">+</button>
                 </div>
               </div>
@@ -206,11 +204,10 @@ export const StreamDetailModal = ({ stream, record, onClose, onUpdateRecord }: P
         </div>
       </div>
 
-      {/* 🌟 確認用ポップアップ */}
       <WatchConfirmModal
         isOpen={isConfirmOpen}
         videoTitle={stream.title}
-        actionType={actionMode} // 🌟 'youtube' か 'manual' かを渡す
+        actionType={actionMode}
         onClose={() => setIsConfirmOpen(false)}
         onConfirm={handleConfirmWatch}
         onSkip={handleSkipWatch}

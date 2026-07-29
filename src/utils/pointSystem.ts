@@ -1,5 +1,5 @@
 // src/utils/pointSystem.ts
-import { doc, getDoc, setDoc, updateDoc, increment, serverTimestamp } from "firebase/firestore";
+import { doc, getDoc, setDoc, updateDoc, increment, serverTimestamp, collection, addDoc } from "firebase/firestore";
 import { db } from "../firebase";
 
 const POINT_PER_WATCH = 100;
@@ -16,8 +16,19 @@ export const getRankInfo = (points: number) => {
 };
 
 // 視聴記録の追加 ＆ ポイント付与
-export const addWatchRecord = async (userId: string, streamId: string, streamTitle: string) => {
+export const addWatchRecord = async (
+  userId: string, 
+  streamId: string, 
+  streamTitle: string,
+  isRecommended: boolean = false // 🌟 追加: おすすめフラグ
+) => {
   if (!userId || !streamId) return;
+
+  // 🌟 1. ポイントとメッセージの分岐
+  const earnedPoints = isRecommended ? 200 : POINT_PER_WATCH;
+  const actionMessage = isRecommended 
+    ? `【今日のおすすめ】「${streamTitle}」を視聴して ${earnedPoints}pt 獲得しました！` 
+    : `「${streamTitle}」を視聴して ${earnedPoints}pt 獲得しました！`;
 
   const userRef = doc(db, "users", userId);
   const recordRef = doc(db, `users/${userId}/watchHistory`, streamId);
@@ -41,16 +52,16 @@ export const addWatchRecord = async (userId: string, streamId: string, streamTit
   if (!userSnap.exists() || isNewMonth) {
     // 新規ユーザー、または月が変わった最初の視聴の場合
     await setDoc(userRef, {
-      monthlyPoints: POINT_PER_WATCH, // 今月のポイントを100からリスタート
-      totalPoints: increment(POINT_PER_WATCH), // 累計はそのまま足す
+      monthlyPoints: earnedPoints, // 🌟 修正: 獲得したポイントを使用
+      totalPoints: increment(earnedPoints), // 🌟 修正: 獲得したポイントを使用
       lastResetMonth: currentMonth,
       updatedAt: serverTimestamp()
     }, { merge: true });
   } else {
     // 同月内の視聴の場合
     await updateDoc(userRef, {
-      monthlyPoints: increment(POINT_PER_WATCH),
-      totalPoints: increment(POINT_PER_WATCH),
+      monthlyPoints: increment(earnedPoints), // 🌟 修正: 獲得したポイントを使用
+      totalPoints: increment(earnedPoints), // 🌟 修正: 獲得したポイントを使用
       updatedAt: serverTimestamp()
     });
   }
@@ -76,4 +87,13 @@ export const addWatchRecord = async (userId: string, streamId: string, streamTit
       updatedAt: serverTimestamp()
     });
   }
+
+  // 🌟 5. タイムラインへの記録（もしFriendTimelineなどでFirestoreの専用コレクションを参照している場合）
+  const timelineRef = collection(db, "timeline");
+  await addDoc(timelineRef, {
+    userId,
+    message: actionMessage,
+    type: isRecommended ? "recommended_watch" : "watch",
+    createdAt: serverTimestamp()
+  });
 };
