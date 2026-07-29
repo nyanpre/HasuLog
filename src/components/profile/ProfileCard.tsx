@@ -2,8 +2,9 @@
 import { useState, useEffect } from 'react';
 import { Edit2, Check, X, LogOut, Heart, Upload } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+// 🌟 追加: フォロー数・フォロワー数を取得するためのフック
+import { useFriends } from '../../hooks/useFriends';
 import type { UserProfileData } from '../../types';
-// 🌟 追加: Firebase Storage の関連関数をインポート
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { storage } from '../../firebase'; 
 
@@ -24,6 +25,8 @@ interface ProfileCardProps {
 
 export default function ProfileCard({ profileData, meetsOptions, onSave, onLogout }: ProfileCardProps) {
   const { currentUser } = useAuth();
+  // 🌟 追加: フックからフォローリストとフォロワーリストを取得
+  const { friends, followers } = useFriends();
   
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [isEditingOshi, setIsEditingOshi] = useState(false);
@@ -32,7 +35,6 @@ export default function ProfileCard({ profileData, meetsOptions, onSave, onLogou
   const [editPhotoUrl, setEditPhotoUrl] = useState("");
   const [editForm, setEditForm] = useState<UserProfileData>(profileData);
 
-  // 🌟 追加: 選択されたファイルと、アップロード中のローディング状態を管理
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
 
@@ -47,24 +49,20 @@ export default function ProfileCard({ profileData, meetsOptions, onSave, onLogou
     setEditForm(profileData);
   }, [profileData]);
 
-  // 🌟 追加: ファイルが選択されたときの処理（プレビュー表示）
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
       setSelectedFile(file);
-      // ローカルの画像を一時的にURL化してプレビュー表示
       setEditPhotoUrl(URL.createObjectURL(file)); 
     }
   };
 
-  // 🌟 変更: プロフィール情報の保存（Storageへのアップロード処理を含む）
   const handleSaveProfileInfo = async () => {
     setIsUploading(true);
     let finalPhotoUrl = editPhotoUrl;
 
     try {
       if (selectedFile && currentUser) {
-        // 同じ名前の画像を上書きしないよう、末尾にタイムスタンプを付ける
         const fileRef = ref(storage, `profiles/${currentUser.uid}_${Date.now()}`);
         await uploadBytes(fileRef, selectedFile);
         finalPhotoUrl = await getDownloadURL(fileRef);
@@ -87,6 +85,12 @@ export default function ProfileCard({ profileData, meetsOptions, onSave, onLogou
     setIsEditingOshi(false);
   };
 
+  // 🌟 追加: タップ時にフレンドリストへスクロールする補助関数
+  const scrollToFriendList = () => {
+    const listElement = document.getElementById('friend-list-section');
+    if (listElement) listElement.scrollIntoView({ behavior: 'smooth' });
+  };
+
   return (
     <div className="bg-white rounded-xl shadow-sm p-5 mb-5">
       {/* ユーザー情報 */}
@@ -98,7 +102,6 @@ export default function ProfileCard({ profileData, meetsOptions, onSave, onLogou
             editName.charAt(0) || 'U'
           )}
           
-          {/* 🌟 編集モード時のみ、画像の上にアイコンをかぶせてアップロードボタン化 */}
           {isEditingProfile && (
             <label className="absolute inset-0 bg-black/40 flex items-center justify-center cursor-pointer opacity-0 hover:opacity-100 transition-opacity">
               <Upload size={20} className="text-white" />
@@ -149,17 +152,29 @@ export default function ProfileCard({ profileData, meetsOptions, onSave, onLogou
               </div>
             </div>
           ) : (
-            <div className="flex items-center gap-2">
-              <h2 className="text-xl font-extrabold text-gray-800 truncate">
-                {currentUser?.displayName || editName || '名無しさん'}
-              </h2>
-              <button 
-                onClick={() => setIsEditingProfile(true)}
-                className="text-gray-400 hover:text-gray-600 transition-colors p-1"
-                aria-label="プロフィールを編集"
-              >
-                <Edit2 size={16} />
-              </button>
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-xl font-extrabold text-gray-800 truncate">
+                  {currentUser?.displayName || editName || '名無しさん'}
+                </h2>
+                <button 
+                  onClick={() => setIsEditingProfile(true)}
+                  className="text-gray-400 hover:text-gray-600 transition-colors p-1"
+                  aria-label="プロフィールを編集"
+                >
+                  <Edit2 size={16} />
+                </button>
+              </div>
+              
+              {/* 🌟 追加: フォロー・フォロワー数表示（タップ可能） */}
+              <div className="flex gap-4 mt-2">
+                <button onClick={scrollToFriendList} className="text-xs sm:text-sm text-gray-600 hover:text-pink-600 transition-colors">
+                  <span className="font-bold text-gray-900">{friends?.length || 0}</span> フォロー
+                </button>
+                <button onClick={scrollToFriendList} className="text-xs sm:text-sm text-gray-600 hover:text-pink-600 transition-colors">
+                  <span className="font-bold text-gray-900">{followers?.length || 0}</span> フォロワー
+                </button>
+              </div>
             </div>
           )}
         </div>

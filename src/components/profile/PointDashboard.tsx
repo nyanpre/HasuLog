@@ -1,12 +1,13 @@
 // src/components/profile/PointDashboard.tsx
 import { useMemo, useEffect, useRef, useState } from 'react';
-import { X, Trophy, Calendar, Activity, Clock, Loader2 } from 'lucide-react'; 
+import { X, Trophy, Calendar, Activity, Clock, Loader2, Users } from 'lucide-react'; 
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import { doc, getDoc, collection, getDocs } from 'firebase/firestore'; 
 import { db } from '../../firebase';
 import { useUserData } from '../../hooks/useUserData';
 import { useUserRecords } from '../../hooks/useUserRecords';
 import { StreamDetailModal } from '../stream/StreamDetailModal'; 
+import { FriendSocialModal } from './FriendSocialModal';
 import type { StreamData } from '../../types';
 import type { StreamRecord } from '../../hooks/useUserRecords';
 
@@ -24,7 +25,6 @@ type DayData = {
   titles: string;
 } | null;
 
-// 🌟 タイムスタンプを安全にパースするヘルパー
 const parseTimestamp = (val: any, fallbackStr: string | undefined) => {
   if (val) {
     if (typeof val === 'string') return new Date(val).getTime();
@@ -45,6 +45,8 @@ export const PointDashboard = ({ onClose, targetUserId, targetUserName }: Props)
   
   const [selectedStream, setSelectedStream] = useState<StreamData | null>(null);
   const [globalStreamTitles, setGlobalStreamTitles] = useState<Record<string, string>>({});
+
+  const [showSocialModal, setShowSocialModal] = useState(false);
 
   useEffect(() => {
     const fetchStreams = async () => {
@@ -167,10 +169,8 @@ export const PointDashboard = ({ onClose, targetUserId, targetUserName }: Props)
       .map(([name, points]) => ({ name, points }));
   }, [records]);
 
-  // 🌟 メモやお気に入りもアクティビティとして表示するように改修
   const recentHistory = useMemo(() => {
     return Object.entries(records)
-      // マイナス処理や未視聴のものは弾く
       .filter(([_, record]) => (record as any).lastAction !== 'decrease' && record.viewCount > 0)
       .map(([id, record]) => {
         const anyRecord = record as any;
@@ -230,16 +230,29 @@ export const PointDashboard = ({ onClose, targetUserId, targetUserName }: Props)
 
           <div className="p-5 overflow-y-auto custom-scrollbar space-y-8">
             
-            <div className="flex items-center gap-4 bg-gray-50/50 p-4 rounded-lg border border-gray-100">
-              <div className="p-2 border border-gray-200 rounded-md bg-white">
-                <Trophy className="w-5 h-5 text-gray-600" />
+            <div className="flex items-center justify-between bg-gray-50/50 p-4 rounded-lg border border-gray-100">
+              <div className="flex items-center gap-4">
+                <div className="p-2 border border-gray-200 rounded-md bg-white">
+                  <Trophy className="w-5 h-5 text-gray-600" />
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold text-gray-500 mb-0.5">HasuLog 累計獲得ポイント</p>
+                  <p className="text-xl font-bold text-gray-800">
+                    {userData?.totalPoints?.toLocaleString() || 0} <span className="text-xs font-normal text-gray-500">pt</span>
+                  </p>
+                </div>
               </div>
-              <div>
-                <p className="text-[10px] font-bold text-gray-500 mb-0.5">HasuLog 累計獲得ポイント</p>
-                <p className="text-xl font-bold text-gray-800">
-                  {userData?.totalPoints?.toLocaleString() || 0} <span className="text-xs font-normal text-gray-500">pt</span>
-                </p>
-              </div>
+              
+              {/* 🌟 変更: 「フレンド」に変更しました */}
+              {targetUserId && (
+                <button
+                  onClick={() => setShowSocialModal(true)}
+                  className="flex items-center gap-1.5 bg-white border border-gray-200 text-pink-500 hover:text-pink-600 hover:border-pink-300 hover:bg-pink-50 px-3 py-1.5 rounded-full text-xs font-bold transition-all shadow-sm"
+                >
+                  <Users size={14} />
+                  フレンド
+                </button>
+              )}
             </div>
 
             <div>
@@ -327,7 +340,7 @@ export const PointDashboard = ({ onClose, targetUserId, targetUserName }: Props)
             <div>
               <h4 className="text-xs font-bold text-gray-700 mb-4 flex items-center">
                 <Clock className="w-3.5 h-3.5 mr-1.5 text-gray-700" />
-                最近のアクティビティ {/* 🌟 タイトルを変更 */}
+                最近のアクティビティ 
               </h4>
               <div className="p-4 rounded-lg border border-gray-100 bg-white">
                 {recentHistory.length > 0 ? (
@@ -344,7 +357,6 @@ export const PointDashboard = ({ onClose, targetUserId, targetUserName }: Props)
                         </div>
                         <div className="flex-shrink-0 text-right bg-pink-50 px-2 py-1 rounded-md">
                           <span className="text-xs font-bold text-pink-600">
-                            {/* 🌟 メモやお気に入りの場合はテキストを変更 */}
                             {item.lastAction === 'memo' ? 'メモ更新' : 
                              item.lastAction === 'favorite' ? 'お気に入り' : 
                              `+${item.viewCount * 100} pt`}
@@ -372,6 +384,14 @@ export const PointDashboard = ({ onClose, targetUserId, targetUserName }: Props)
           record={myRecords[selectedStream.id] || null}
           onClose={() => setSelectedStream(null)} 
           onUpdateRecord={myUpdateRecord}
+        />
+      )}
+
+      {showSocialModal && targetUserId && (
+        <FriendSocialModal 
+          targetUserId={targetUserId} 
+          targetUserName={targetUserName || userData?.displayName || 'ユーザー'} 
+          onClose={() => setShowSocialModal(false)} 
         />
       )}
     </>

@@ -7,6 +7,8 @@ import { Loader2, Star } from 'lucide-react';
 import { StreamCard } from '../stream/StreamCard';
 import { StreamDetailModal } from '../stream/StreamDetailModal';
 import { useUserRecords } from '../../hooks/useUserRecords';
+// 🌟 追加: 作成した感想スレッドコンポーネントをインポート
+import { DailyThread } from '../thread/DailyThread';
 import type { StreamData } from '../../types';
 
 export default function Recommendation() {
@@ -25,14 +27,14 @@ export default function Recommendation() {
         })) as StreamData[];
 
         if (streamList.length > 0) {
-          // 🌟 1. ID順に並び替えて、リストの順番を全ユーザーで統一する
+          // 1. ID順に並び替えて、リストの順番を全ユーザーで統一する
           streamList.sort((a, b) => a.id.localeCompare(b.id));
 
-          // 🌟 2. 今日の日付文字列（例: "2024-5-15"）を作成
+          // 2. 今日の日付文字列（例: "2024-5-15"）を作成
           const today = new Date();
           const dateString = `${today.getFullYear()}-${today.getMonth() + 1}-${today.getDate()}`;
           
-          // 🌟 3. 日付文字列から計算した数字を使って、1日固定の動画を選ぶ
+          // 3. 日付文字列から計算した数字を使って、1日固定の動画を選ぶ
           let hash = 0;
           for (let i = 0; i < dateString.length; i++) {
             hash = dateString.charCodeAt(i) + ((hash << 5) - hash);
@@ -76,6 +78,11 @@ export default function Recommendation() {
           おすすめデータがありません
         </div>
       )}
+
+      {/* 🌟 追加: おすすめ動画の下に感想スレッドを配置 */}
+      <div className="max-w-md mx-auto mt-8">
+        <DailyThread />
+      </div>
 
       {selectedStream && (
         <StreamDetailModal 
