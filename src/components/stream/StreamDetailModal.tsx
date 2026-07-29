@@ -10,7 +10,7 @@ type Props = {
   stream: StreamData | null;
   record: StreamRecord | null;
   onClose: () => void;
-  onUpdateRecord: (id: string, data: Partial<StreamRecord> & Record<string, any>) => Promise<void>; // 型を少し柔軟に
+  onUpdateRecord: (id: string, data: Partial<StreamRecord> & Record<string, any>) => Promise<void>;
   isRecommended?: boolean;
 };
 
@@ -33,7 +33,6 @@ export const StreamDetailModal = ({ stream, record, onClose, onUpdateRecord, isR
     
     setSaveStatus("saving");
     try {
-      // 🌟 メモ更新をアクティビティとして認識させるための情報を追加
       await onUpdateRecord(stream.id, { 
         memo: localMemo,
         lastAction: 'memo',
@@ -51,7 +50,6 @@ export const StreamDetailModal = ({ stream, record, onClose, onUpdateRecord, isR
   const toggleFavorite = () => {
     if (typeof onUpdateRecord !== 'function') return;
     const currentFav = record?.isFavorite || false;
-    // 🌟 お気に入り更新をアクティビティとして認識させるための情報を追加
     onUpdateRecord(stream.id, { 
       isFavorite: !currentFav,
       lastAction: 'favorite',
@@ -104,9 +102,11 @@ export const StreamDetailModal = ({ stream, record, onClose, onUpdateRecord, isR
   return (
     <>
       <div className="fixed inset-0 z-50 flex justify-center items-end sm:items-center bg-black/60 backdrop-blur-sm p-0 sm:p-4 transition-opacity">
-        <div className="bg-white w-full max-w-2xl sm:rounded-xl shadow-2xl flex flex-col max-h-[90vh] sm:max-h-[85vh] animate-slide-up sm:animate-fade-in">
+        {/* 🌟 変更点1：高さを max-h-[80vh] に下げ、角を丸く(rounded-t-2xl)、はみ出しを防ぐ(overflow-hidden) */}
+        <div className="bg-white w-full max-w-2xl rounded-t-2xl sm:rounded-xl shadow-2xl flex flex-col max-h-[80vh] sm:max-h-[85vh] animate-slide-up sm:animate-fade-in overflow-hidden">
           
-          <div className="flex justify-between items-center p-3 border-b border-gray-100">
+          {/* 🌟 変更点2：ヘッダーのパディングを広げ(p-4)、×ボタンを大きく(w-9 h-9) */}
+          <div className="flex justify-between items-center p-4 border-b border-gray-100">
             <h3 className="font-bold text-gray-800 text-sm truncate flex items-center">
               {isRecommended && (
                 <span className="bg-gray-100 text-gray-600 border border-gray-200 text-[10px] px-2 py-0.5 rounded mr-2">
@@ -115,7 +115,12 @@ export const StreamDetailModal = ({ stream, record, onClose, onUpdateRecord, isR
               )}
               【 動画詳細 】
             </h3>
-            <button onClick={onClose} className="w-7 h-7 flex-shrink-0 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200 text-gray-600">✕</button>
+            <button 
+              onClick={onClose} 
+              className="w-9 h-9 flex-shrink-0 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200 text-gray-600 text-lg transition-colors"
+            >
+              ✕
+            </button>
           </div>
 
           <div className="overflow-y-auto p-4 sm:p-5 custom-scrollbar">
