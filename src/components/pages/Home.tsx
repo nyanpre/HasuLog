@@ -2,33 +2,34 @@
 import { useState, useEffect } from 'react';
 import { LayoutList, Grid2X2, Grid3X3, ArrowUpDown, Loader2 } from 'lucide-react';
 import { collection, getDocs } from 'firebase/firestore';
-import { db } from '../../firebase'; // ← firebase.tsからdbをインポート
-import VideoCard from '../VideoCard';
-import VideoModal from '../VideoModal';
-import type { VideoData } from '../../types';
+import { db } from '../../firebase'; 
+
+import { StreamCard } from '../stream/StreamCard';
+import { StreamDetailModal } from '../stream/StreamDetailModal';
+import { useUserRecords } from '../../hooks/useUserRecords';
+import type { StreamData } from '../../types';
 
 type LayoutType = 1 | 2 | 4;
 type SortOrder = 'desc' | 'asc';
 
 export default function Home() {
-  const [videos, setVideos] = useState<VideoData[]>([]); // 取得したデータを保存するState
+  const { records, updateRecord } = useUserRecords();
+  const [streams, setStreams] = useState<StreamData[]>([]); 
   const [layout, setLayout] = useState<LayoutType>(2);
-  const [selectedVideo, setSelectedVideo] = useState<VideoData | null>(null);
+  const [selectedStream, setSelectedStream] = useState<StreamData | null>(null);
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
-  const [isLoading, setIsLoading] = useState(true); // ローディング状態の管理
+  const [isLoading, setIsLoading] = useState(true);
 
-  // 画面が表示された時に1回だけFirestoreからデータを取得する
   useEffect(() => {
-    const fetchVideos = async () => {
+    const fetchStreams = async () => {
       try {
-        // 'videos' コレクションからデータを全件取得
-        const querySnapshot = await getDocs(collection(db, 'videos'));
-        const videoList = querySnapshot.docs.map(doc => ({
+        const querySnapshot = await getDocs(collection(db, 'streams'));
+        const streamList = querySnapshot.docs.map(doc => ({
           id: doc.id,
           ...doc.data()
-        })) as VideoData[];
+        })) as StreamData[];
         
-        setVideos(videoList);
+        setStreams(streamList);
       } catch (error) {
         console.error("データの取得に失敗しました:", error);
       } finally {
@@ -36,13 +37,12 @@ export default function Home() {
       }
     };
 
-    fetchVideos();
+    fetchStreams();
   }, []);
 
-  // ソート処理
-  const sortedVideos = [...videos].sort((a, b) => {
-    const timeA = new Date(a.date).getTime();
-    const timeB = new Date(b.date).getTime();
+  const sortedStreams = [...streams].sort((a, b) => {
+    const timeA = new Date(a.date || 0).getTime();
+    const timeB = new Date(b.date || 0).getTime();
     return sortOrder === 'desc' ? timeB - timeA : timeA - timeB;
   });
 
@@ -78,32 +78,44 @@ export default function Home() {
         </div>
       </div>
 
-      {/* ローディング表示 または データ表示 */}
       {isLoading ? (
         <div className="flex justify-center items-center py-20">
           <Loader2 className="animate-spin text-pink-500" size={32} />
         </div>
-      ) : videos.length === 0 ? (
+      ) : streams.length === 0 ? (
         <div className="text-center py-20 text-gray-500 text-sm">
           データがありません
         </div>
       ) : (
         <div className={`grid ${gridClass}`}>
-          {sortedVideos.map((video) => (
-            <VideoCard 
-              key={video.id} 
-              video={video} 
-              layout={layout} 
-              onClick={setSelectedVideo} 
-            />
-          ))}
+          {sortedStreams.map((stream) => {
+            const currentRecord = records[stream.id];
+            const currentViewCount = currentRecord?.viewCount || 0;
+
+            return (
+              <StreamCard 
+                key={stream.id} 
+                stream={stream} 
+                columns={layout}
+                viewCount={currentViewCount}
+                onClick={() => setSelectedStream(stream)} 
+                onUpdateViewCount={(delta, e) => {
+                  e?.stopPropagation(); // カード全体のモーダルが開かないようにする
+                  const newCount = Math.max(0, currentViewCount + delta);
+                  updateRecord(stream.id, { viewCount: newCount });
+                }}
+              />
+            );
+          })}
         </div>
       )}
 
-      {selectedVideo && (
-        <VideoModal 
-          video={selectedVideo} 
-          onClose={() => setSelectedVideo(null)} 
+      {selectedStream && (
+        <StreamDetailModal 
+          stream={selectedStream} 
+          record={selectedStream ? (records[selectedStream.id] || null) : null}
+          onClose={() => setSelectedStream(null)} 
+          onUpdateRecord={updateRecord}
         />
       )}
     </div>
