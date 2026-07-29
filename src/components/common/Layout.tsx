@@ -1,6 +1,6 @@
 // src/components/Layout.tsx
 import { Outlet, Link } from "react-router-dom";
-import { Home, History, Clock, User, Star } from "lucide-react"; // 🌟 Starに変更
+import { Home, History, Clock, User, Star } from "lucide-react"; 
 import { type ReactNode } from "react";
 
 interface LayoutProps {
@@ -16,32 +16,35 @@ export default function Layout({ children }: LayoutProps) {
         </div>
       </header>
 
-      <main className="flex-1 overflow-y-auto pb-20">
+      {/* 🌟 メニューバーが高くなる分、一番下のコンテンツが隠れないように pb-20 を pb-24 に変更 */}
+      <main className="flex-1 overflow-y-auto pb-24">
         {children || <Outlet />}
       </main>
 
       <nav className="bg-white border-t fixed bottom-0 w-full pb-safe-bottom z-10">
-        <div className="flex justify-around items-center h-16">
-          <Link to="/" className="flex flex-col items-center text-gray-500 hover:text-pink-500">
+        {/* 🌟 h-16 を h-[72px] に変更して少し高くし、pb-2 (約8px) でアイコン全体を上に押し上げます */}
+        <div className="flex justify-around items-center h-[72px] pb-2">
+          <Link to="/" className="flex flex-col items-center text-gray-500 hover:text-pink-500 transition-colors">
             <Home size={24} />
             <span className="text-[10px] mt-1">ホーム</span>
           </Link>
 
-          {/* 🌟 シンプルな星アイコンに変更 */}
-          <Link to="/recommendation" className="flex flex-col items-center text-gray-500 hover:text-pink-500">
+          <Link to="/recommendation" className="flex flex-col items-center text-gray-500 hover:text-pink-500 transition-colors">
             <Star size={24} />
             <span className="text-[10px] mt-1">おすすめ</span>
           </Link>
 
-          <Link to="/history" className="flex flex-col items-center text-gray-500 hover:text-pink-500">
+          <Link to="/history" className="flex flex-col items-center text-gray-500 hover:text-pink-500 transition-colors">
             <History size={24} />
             <span className="text-[10px] mt-1">履歴</span>
           </Link>
-          <Link to="/timeline" className="flex flex-col items-center text-gray-500 hover:text-pink-500">
+          
+          <Link to="/timeline" className="flex flex-col items-center text-gray-500 hover:text-pink-500 transition-colors">
             <Clock size={24} />
             <span className="text-[10px] mt-1">タイムライン</span>
           </Link>
-          <Link to="/profile" className="flex flex-col items-center text-gray-500 hover:text-pink-500">
+          
+          <Link to="/profile" className="flex flex-col items-center text-gray-500 hover:text-pink-500 transition-colors">
             <User size={24} />
             <span className="text-[10px] mt-1">マイページ</span>
           </Link>
