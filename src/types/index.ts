@@ -11,6 +11,7 @@ export interface StreamData {
   youtubeUrl: string;
   thumbnailUrl: string;
   description: string;
+  is_official?: boolean;
 }
 
 export interface VideoData {
