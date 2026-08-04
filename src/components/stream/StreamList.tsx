@@ -1,11 +1,9 @@
-// src/components/StreamList.tsx
-
+// src/components/stream/StreamList.tsx
 import { useEffect, useState, useMemo } from "react";
-import { collection, getDocs, query, orderBy } from "firebase/firestore";
-import { db } from "../../firebase";
-import type { StreamData } from "../../types";
 
+import type { StreamData } from "../../types";
 import { useUserRecords } from "../../hooks/useUserRecords";
+import { useStreams } from "../../contexts/StreamContext";
 import { StreamCard } from "./StreamCard";
 import { MemberFilterModal, type FilterState } from "./MemberFilterModal";
 import { StreamDetailModal } from "./StreamDetailModal";
@@ -17,10 +15,9 @@ const MEMBERS = [
 
 export const StreamList = () => {
   const { records, updateRecord } = useUserRecords();
-
-  const [streams, setStreams] = useState<StreamData[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
+  
+  // Contextから受け取る
+  const { streams, isLoading: loading, error } = useStreams();
 
   const [columns, setColumns] = useState<1 | 2 | 4>(() => {
     const saved = sessionStorage.getItem('hl_columns');
@@ -36,6 +33,8 @@ export const StreamList = () => {
   
   const [filterSeason, setFilterSeason] = useState<string>(() => sessionStorage.getItem('hl_season') || "all");
   const [filterType, setFilterType] = useState<string>(() => sessionStorage.getItem('hl_type') || "all");
+  //  視聴状態のフィルターState
+  const [filterWatched, setFilterWatched] = useState<string>(() => sessionStorage.getItem('hl_watched') || "all");
   const [sortOrder, setSortOrder] = useState<"desc" | "asc">(() => (sessionStorage.getItem('hl_sort') as "desc" | "asc") || "desc");
   
   const [memberFilters, setMemberFilters] = useState<Record<string, FilterState>>(() => {
@@ -53,32 +52,10 @@ export const StreamList = () => {
     sessionStorage.setItem('hl_filterOpen', String(isFilterOpen));
     sessionStorage.setItem('hl_season', filterSeason);
     sessionStorage.setItem('hl_type', filterType);
+    sessionStorage.setItem('hl_watched', filterWatched); // 🌟 追加: セッションに保存
     sessionStorage.setItem('hl_sort', sortOrder);
     sessionStorage.setItem('hl_members', JSON.stringify(memberFilters));
-  }, [columns, isFilterOpen, filterSeason, filterType, sortOrder, memberFilters]);
-
-  useEffect(() => {
-    const fetchStreams = async () => {
-      try {
-        const streamsRef = collection(db, "streams");
-        const q = query(streamsRef, orderBy("date", "desc"));
-        const snapshot = await getDocs(q);
-        
-        const streamData = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        }) as StreamData);
-        
-        setStreams(streamData);
-      } catch (err) {
-        console.error("データの取得に失敗しました:", err);
-        setError("データの読み込みに失敗しました。");
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchStreams();
-  }, []);
+  }, [columns, isFilterOpen, filterSeason, filterType, filterWatched, sortOrder, memberFilters]); // 🌟 追加: 依存配列にfilterWatchedを追加
 
   const getViewCount = (id: string) => records[id]?.viewCount || 0;
 
@@ -90,10 +67,10 @@ export const StreamList = () => {
     setMemberFilters(MEMBERS.reduce((acc, member) => ({ ...acc, [member]: "none" }), {}));
   };
 
-  // 🌟 フィルターリセット処理（ソート以外を初期化）
   const handleResetFilters = () => {
     setFilterSeason("all");
     setFilterType("all");
+    setFilterWatched("all"); // 🌟 追加: リセット時にallに戻す
     resetMemberFilters();
   };
 
@@ -103,8 +80,19 @@ export const StreamList = () => {
     if (filterSeason !== "all") {
       result = result.filter(s => s.season && s.season.startsWith(filterSeason));
     }
+    
     if (filterType !== "all") {
       result = result.filter(s => s.type === filterType);
+    }
+
+    // 視聴済み/未視聴のフィルタリングロジック
+    if (filterWatched !== "all") {
+      result = result.filter(s => {
+        const viewCount = records[s.id]?.viewCount || 0;
+        if (filterWatched === "watched") return viewCount > 0;
+        if (filterWatched === "unwatched") return viewCount === 0;
+        return true;
+      });
     }
 
     const includes = MEMBERS.filter(m => memberFilters[m] === "include");
@@ -120,15 +108,15 @@ export const StreamList = () => {
     }
 
     return sortOrder === "asc" ? result.reverse() : result;
-  }, [streams, filterSeason, filterType, memberFilters, sortOrder]);
-
+  }, [streams, filterSeason, filterType, filterWatched, memberFilters, sortOrder, records]); // 🌟 追加: filterWatched と records を依存配列に追加
 
   if (loading) return <div className="p-5 text-center text-gray-500">データを読み込み中...</div>;
   if (error) return <div className="p-5 text-center text-red-500">{error}</div>;
 
   const gridClass = columns === 1 ? "grid-cols-1" : columns === 2 ? "grid-cols-2" : "grid-cols-2 md:grid-cols-3 lg:grid-cols-4";
   const isFilteringMembers = Object.values(memberFilters).some(state => state !== "none");
-  const isAnyFilterActive = filterSeason !== "all" || filterType !== "all" || isFilteringMembers;
+  // 🌟 追加: filterWatched の判定を追加
+  const isAnyFilterActive = filterSeason !== "all" || filterType !== "all" || filterWatched !== "all" || isFilteringMembers;
 
   return (
     <div className="max-w-6xl mx-auto p-3 md:p-6 pb-24">
@@ -175,6 +163,13 @@ export const StreamList = () => {
                 <option value="with_station">With×STATION</option>
               </select>
 
+              {/* 視聴状態のフィルターUI */}
+              <select value={filterWatched} onChange={(e) => setFilterWatched(e.target.value)} className="text-xs sm:text-sm py-1.5 pl-2 pr-8 border-gray-300 rounded-md shadow-sm focus:border-blue-300 focus:ring-0">
+                <option value="all">視聴/未視聴 すべて</option>
+                <option value="watched">視聴済み</option>
+                <option value="unwatched">未視聴</option>
+              </select>
+
               <select value={sortOrder} onChange={(e) => setSortOrder(e.target.value as "desc" | "asc")} className="text-xs sm:text-sm py-1.5 pl-2 pr-8 border-gray-300 rounded-md shadow-sm focus:border-blue-300 focus:ring-0">
                 <option value="desc">新しい順</option>
                 <option value="asc">古い順</option>
@@ -193,7 +188,6 @@ export const StreamList = () => {
                 )}
               </button>
 
-              {/* 🌟 リセットボタン（何かしらフィルターがかかっている時だけ強調表示などアレンジ可能ですが、今回はシンプルに配置） */}
               {isAnyFilterActive && (
                 <button 
                   onClick={handleResetFilters}

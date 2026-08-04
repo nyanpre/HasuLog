@@ -4,6 +4,10 @@ import { auth } from './firebase';
 import { useAuth } from './contexts/AuthContext';
 import { Routes, Route, Navigate } from 'react-router-dom';
 
+import { StreamProvider } from './contexts/StreamContext';
+// 🌟 新しく作成した Provider をインポート
+import { UserRecordsProvider } from './contexts/UserRecordsContext';
+
 import Layout from './components/common/Layout';
 import { StreamList } from './components/stream/StreamList';
 import Profile from './components/pages/Profile';
@@ -33,18 +37,22 @@ export default function App() {
 
   if (currentUser) {
     return (
-      <Layout>
-        <Routes>
-          <Route path="/" element={<StreamList />} />
-          <Route path="/history" element={<History />} />
-          <Route path="/profile" element={<Profile />} />
-          <Route path="/timeline" element={<Timeline />} />
-          <Route path="recommendation" element={<Recommendation />} />
-          
-          {/* 🌟 追加：上記以外のURLで開かれた場合、強制的にホーム(/)へリダイレクト */}
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </Layout>
+      // 🌟 UserRecordsProvider と StreamProvider でアプリ全体を囲む
+      <UserRecordsProvider>
+        <StreamProvider>
+          <Layout>
+            <Routes>
+              <Route path="/" element={<StreamList />} />
+              <Route path="/history" element={<History />} />
+              <Route path="/profile" element={<Profile />} />
+              <Route path="/timeline" element={<Timeline />} />
+              <Route path="recommendation" element={<Recommendation />} />
+              
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          </Layout>
+        </StreamProvider>
+      </UserRecordsProvider>
     );
   }
 

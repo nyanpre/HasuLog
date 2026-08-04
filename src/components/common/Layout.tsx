@@ -1,18 +1,31 @@
 // src/components/Layout.tsx
+import { useState, type ReactNode } from "react";
 import { Outlet, Link } from "react-router-dom";
 import { Home, History, Clock, User, Star } from "lucide-react"; 
-import { type ReactNode } from "react";
+import { HowToUseModal } from "./HowToUseModal";
 
 interface LayoutProps {
   children?: ReactNode;
 }
 
 export default function Layout({ children }: LayoutProps) {
+  // 🌟 追加: モーダルの開閉状態を管理するState
+  const [isHelpModalOpen, setIsHelpModalOpen] = useState(false);
+
   return (
     <div className="flex flex-col min-h-screen bg-gray-50">
       <header className="bg-white shadow-sm sticky top-0 z-10 pt-safe-top">
-        <div className="px-4 py-3 text-center">
+        {/* 🌟 修正: relative を追加して中のボタンを右端に絶対配置できるようにする */}
+        <div className="relative px-4 py-3 flex justify-center items-center">
           <h1 className="text-xl font-bold text-pink-500 tracking-wider">HasuLog</h1>
+          
+          {/* 🌟 追加: 使い方ボタン（アイコンなし・テキストのみのシンプルなデザイン） */}
+          <button 
+            onClick={() => setIsHelpModalOpen(true)}
+            className="absolute right-4 text-xs font-bold text-gray-400 hover:text-gray-700 transition-colors"
+          >
+            使い方
+          </button>
         </div>
       </header>
 
@@ -50,6 +63,12 @@ export default function Layout({ children }: LayoutProps) {
           </Link>
         </div>
       </nav>
+
+      {/* 🌟 追加: モーダル本体（isOpenがtrueの時だけ画面の手前に表示される） */}
+      <HowToUseModal 
+        isOpen={isHelpModalOpen} 
+        onClose={() => setIsHelpModalOpen(false)} 
+      />
     </div>
   );
 }
