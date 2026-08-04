@@ -7,7 +7,6 @@ import { Loader2, Star } from 'lucide-react';
 import { StreamCard } from '../stream/StreamCard';
 import { StreamDetailModal } from '../stream/StreamDetailModal';
 import { useUserRecords } from '../../hooks/useUserRecords';
-// 🌟 追加: 作成した感想スレッドコンポーネントをインポート
 import { DailyThread } from '../thread/DailyThread';
 import type { StreamData } from '../../types';
 
@@ -30,18 +29,36 @@ export default function Recommendation() {
           // 1. ID順に並び替えて、リストの順番を全ユーザーで統一する
           streamList.sort((a, b) => a.id.localeCompare(b.id));
 
-          // 2. 今日の日付文字列（例: "2024-5-15"）を作成
+          // 2. 今日の日付文字列を作成
           const today = new Date();
           const dateString = `${today.getFullYear()}-${today.getMonth() + 1}-${today.getDate()}`;
           
-          // 3. 日付文字列から計算した数字を使って、1日固定の動画を選ぶ
+          // 3. 日付からハッシュを計算
           let hash = 0;
           for (let i = 0; i < dateString.length; i++) {
             hash = dateString.charCodeAt(i) + ((hash << 5) - hash);
           }
-          const fixedIndex = Math.abs(hash) % streamList.length;
           
-          setRecommendedStream(streamList[fixedIndex]);
+          // 🌟 修正ポイント1: フィルタリング前の「全動画数」を使ってインデックスを計算する（これまで通り）
+          const startIndex = Math.abs(hash) % streamList.length;
+          
+          let selectedIndex = startIndex;
+          let candidate = streamList[selectedIndex];
+
+          // 🌟 修正ポイント2: 選ばれた動画に youtubeUrl がない場合のみ、ある動画が見つかるまで次へ進む
+          // （※現在の動画にはURLがあるため、今日はこのループはスキップされ今の動画が維持されます！）
+          while (!candidate.youtubeUrl || candidate.youtubeUrl.trim() === "") {
+            selectedIndex = (selectedIndex + 1) % streamList.length;
+            candidate = streamList[selectedIndex];
+            
+            // 無限ループ防止（万が一すべての動画にURLがない場合のフェイルセーフ）
+            if (selectedIndex === startIndex) {
+              candidate = null as any;
+              break;
+            }
+          }
+          
+          setRecommendedStream(candidate);
         }
       } catch (error) {
         console.error("データの取得に失敗しました:", error);
@@ -75,11 +92,10 @@ export default function Recommendation() {
         </div>
       ) : (
         <div className="text-center py-20 text-gray-500 text-sm">
-          おすすめデータがありません
+          おすすめできる動画がありません
         </div>
       )}
 
-      {/* 🌟 追加: おすすめ動画の下に感想スレッドを配置 */}
       <div className="max-w-md mx-auto mt-8">
         <DailyThread />
       </div>
