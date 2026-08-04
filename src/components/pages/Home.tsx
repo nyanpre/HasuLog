@@ -1,12 +1,13 @@
 // src/components/pages/Home.tsx
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { LayoutList, Grid2X2, Grid3X3, ArrowUpDown, Loader2 } from 'lucide-react';
-import { collection, getDocs } from 'firebase/firestore';
-import { db } from '../../firebase'; 
+// 🌟 Firebase通信用のインポートを削除しました
 
 import { StreamCard } from '../stream/StreamCard';
 import { StreamDetailModal } from '../stream/StreamDetailModal';
 import { useUserRecords } from '../../hooks/useUserRecords';
+// 🌟 新しく作成した Context をインポート
+import { useStreams } from '../../contexts/StreamContext';
 import type { StreamData } from '../../types';
 
 type LayoutType = 1 | 2 | 4;
@@ -14,31 +15,16 @@ type SortOrder = 'desc' | 'asc';
 
 export default function Home() {
   const { records, updateRecord } = useUserRecords();
-  const [streams, setStreams] = useState<StreamData[]>([]); 
+  
+  // 🌟 Contextから動画データとローディング状態を受け取る
+  const { streams, isLoading } = useStreams();
+  
   const [layout, setLayout] = useState<LayoutType>(2);
   const [selectedStream, setSelectedStream] = useState<StreamData | null>(null);
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
-  const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    const fetchStreams = async () => {
-      try {
-        const querySnapshot = await getDocs(collection(db, 'streams'));
-        const streamList = querySnapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        })) as StreamData[];
-        
-        setStreams(streamList);
-      } catch (error) {
-        console.error("データの取得に失敗しました:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchStreams();
-  }, []);
+  // 🌟 ここにあった useState(streams) と useEffect(fetchStreams) による
+  // Firebaseからのデータ取得処理は完全に削除しました！
 
   const sortedStreams = [...streams].sort((a, b) => {
     const timeA = new Date(a.date || 0).getTime();
@@ -99,7 +85,6 @@ export default function Home() {
                 columns={layout}
                 viewCount={currentViewCount}
                 onClick={() => setSelectedStream(stream)} 
-                /* 🌟 不要になった onUpdateViewCount をここから削除しました！ */
               />
             );
           })}
