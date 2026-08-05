@@ -4,7 +4,7 @@ import * as Dialog from '@radix-ui/react-dialog';
 import { useAuth } from "../../contexts/AuthContext";
 import { addWatchRecord, removeWatchRecord } from "../../utils/pointSystem";
 import { WatchConfirmModal } from "../common/WatchConfirmModal";
-import { usePublicMemos } from "../../hooks/usePublicMemos"; // 🌟 追加: フックをインポート
+import { usePublicMemos } from "../../hooks/usePublicMemos";
 import type { StreamData } from "../../types";
 import type { StreamRecord } from "../../hooks/useUserRecords";
 
@@ -24,7 +24,6 @@ export const StreamDetailModal = ({ stream, record, onClose, onUpdateRecord, isR
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [actionMode, setActionMode] = useState<'youtube' | 'increase' | 'decrease'>('youtube');
 
-  // 🌟 追加: みんなのメモを取得
   const { memos: publicMemos, loading: memosLoading } = usePublicMemos(stream?.id);
 
   useEffect(() => {
@@ -39,10 +38,10 @@ export const StreamDetailModal = ({ stream, record, onClose, onUpdateRecord, isR
     setSaveStatus("saving");
     try {
       await onUpdateRecord(stream.id, { 
-        streamId: stream.id, // 🌟 検索用に動画IDも保存
+        streamId: stream.id,
         memo: localMemo,
         memoVisibility: visibility,
-        userName: currentUser?.displayName || '名無しユーザー', // 🌟 公開用に名前も保存
+        userName: currentUser?.displayName || '名無しユーザー',
         lastAction: 'memo',
         updatedAt: new Date().toISOString()
       });
@@ -82,28 +81,29 @@ export const StreamDetailModal = ({ stream, record, onClose, onUpdateRecord, isR
     }
   };
 
-  const handleConfirmWatch = async () => {
+  // 🌟 修正ポイント1: asyncを外し、待たずにすぐYouTubeを開く（フリーズ回避）
+  const handleConfirmWatch = () => {
     setIsConfirmOpen(false);
+
     if (currentUser && stream) {
-      try {
-        if (actionMode === 'decrease') {
-          await removeWatchRecord(currentUser.uid, stream.id, stream.title);
-        } else {
-          await addWatchRecord(currentUser.uid, stream.id, stream.title, isRecommended);
-        }
-      } catch (error) {
-        console.error("記録に失敗しました", error);
+      // データベースへの記録は裏側で勝手にやらせる (awaitしない)
+      if (actionMode === 'decrease') {
+        removeWatchRecord(currentUser.uid, stream.id, stream.title).catch(console.error);
+      } else {
+        addWatchRecord(currentUser.uid, stream.id, stream.title, isRecommended).catch(console.error);
       }
     }
-    if (actionMode === 'youtube' && stream) {
-      window.open(stream.youtubeUrl, "_blank");
+
+    // ユーザーのクリック直後なので、ブロックされずに100%開く
+    if (actionMode === 'youtube' && stream && stream.youtubeUrl) {
+      window.open(stream.youtubeUrl, "_blank", "noopener,noreferrer");
     }
   };
 
   const handleSkipWatch = () => {
     setIsConfirmOpen(false);
-    if (actionMode === 'youtube' && stream) {
-      window.open(stream.youtubeUrl, "_blank");
+    if (actionMode === 'youtube' && stream && stream.youtubeUrl) {
+      window.open(stream.youtubeUrl, "_blank", "noopener,noreferrer");
     } 
   };
 
@@ -233,7 +233,6 @@ export const StreamDetailModal = ({ stream, record, onClose, onUpdateRecord, isR
                     </div>
                   </div>
 
-                  {/* 🌟 追加: みんなのメモ表示エリア */}
                   <div className="mt-8 border-t border-gray-200 pt-6">
                     <h4 className="text-sm font-bold text-gray-800 mb-4">みんなのメモ</h4>
                     
@@ -241,8 +240,9 @@ export const StreamDetailModal = ({ stream, record, onClose, onUpdateRecord, isR
                       <p className="text-xs text-gray-500">読み込み中...</p>
                     ) : publicMemos.length > 0 ? (
                       <div className="flex flex-col gap-3">
-                        {publicMemos.map(m => (
-                          <div key={m.id} className="bg-gray-50 p-3 rounded-lg border border-gray-100">
+                        {/* 🌟 修正ポイント2: indexを使って重複エラーを完全解消 */}
+                        {publicMemos.map((m, index) => (
+                          <div key={`${m.id}-${index}`} className="bg-gray-50 p-3 rounded-lg border border-gray-100">
                             <div className="flex items-center gap-2 mb-1.5">
                               <span className="text-xs font-bold text-gray-700">
                                 {m.visibility === 'public_named' ? (m.userName || '名無し') : '匿名ユーザー'}
