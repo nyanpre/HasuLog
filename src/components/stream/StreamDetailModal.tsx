@@ -24,8 +24,8 @@ export const StreamDetailModal = ({ stream, record, onClose, onUpdateRecord, isR
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [actionMode, setActionMode] = useState<'youtube' | 'increase' | 'decrease'>('youtube');
 
-  const { memos: publicMemos, loading: memosLoading } = usePublicMemos(stream?.id);
-
+  const { memos: publicMemos, loading: memosLoading, refetch: refetchMemos } = usePublicMemos(stream?.id);
+  
   useEffect(() => {
     setLocalMemo(record?.memo || "");
     setVisibility(record?.memoVisibility || 'private');
@@ -46,6 +46,10 @@ export const StreamDetailModal = ({ stream, record, onClose, onUpdateRecord, isR
         updatedAt: new Date().toISOString()
       });
       setSaveStatus("success");
+      
+      // 🌟 追加: 保存が完了したら、最新のメモ一覧を取得し直して表示を即時反映する
+      refetchMemos(); 
+      
       setTimeout(() => setSaveStatus("idle"), 2000);
     } catch (error) {
       console.error("保存エラー:", error);

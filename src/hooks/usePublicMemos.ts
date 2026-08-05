@@ -1,34 +1,50 @@
 // src/hooks/usePublicMemos.ts
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { collectionGroup, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
 
 export type PublicMemo = {
-  id: string; // ドキュメントID
-  userId: string; // 作成者のUID
+  id: string;
+  userId: string;
   memo: string;
   visibility: 'public_anonymous' | 'public_named';
   updatedAt: string;
   userName?: string;
 };
 
+const memoCache = new Map<string, { data: PublicMemo[], timestamp: number }>();
+const CACHE_DURATION = 5 * 60 * 1000; // 5分
+
 export const usePublicMemos = (streamId: string | undefined) => {
   const [memos, setMemos] = useState<PublicMemo[]>([]);
   const [loading, setLoading] = useState(false);
+  const [refreshCount, setRefreshCount] = useState(0); // 🌟 追加: 再取得用トリガー
   const { currentUser } = useAuth();
 
+  // 🌟 追加: キャッシュを破棄して強制的に再取得する関数
+  const refetch = useCallback(() => {
+    if (streamId) {
+      memoCache.delete(streamId); // この動画のキャッシュを消去
+      setRefreshCount((prev) => prev + 1); // useEffectを再実行させる
+    }
+  }, [streamId]);
+
   useEffect(() => {
-    // streamIdが無い場合や、初期化前は処理しない
     if (!streamId) {
       setMemos([]);
       return;
     }
 
     const fetchMemos = async () => {
+      const cached = memoCache.get(streamId);
+      if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+        setMemos(cached.data);
+        return;
+      }
+
       setLoading(true);
       try {
-        // collectionGroupを使って、全ユーザーの watchHistory から該当する動画の公開メモを検索
         const memosQuery = query(
           collectionGroup(db, 'watchHistory'),
           where('streamId', '==', streamId),
@@ -42,7 +58,6 @@ export const usePublicMemos = (streamId: string | undefined) => {
           const data = doc.data();
           const userId = doc.ref.parent.parent?.id || 'unknown';
 
-          // 空のメモや、自分のメモ（自分の入力欄で確認できるため）は一覧から除外する
           if (!data.memo || data.memo.trim() === '') return;
 
           fetchedMemos.push({
@@ -55,19 +70,19 @@ export const usePublicMemos = (streamId: string | undefined) => {
           });
         });
 
-        // 新しい順に並べ替え
         fetchedMemos.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+        
+        memoCache.set(streamId, { data: fetchedMemos, timestamp: Date.now() });
         setMemos(fetchedMemos);
       } catch (error) {
         console.error('公開メモの取得エラー:', error);
-        // ※最初はFirestoreのインデックス作成が必要なため、ここにエラーが出ます（後述します）
       } finally {
         setLoading(false);
       }
     };
 
     fetchMemos();
-  }, [streamId, currentUser]);
+  }, [streamId, currentUser?.uid, refreshCount]); // 🌟 refreshCountを追加
 
-  return { memos, loading };
+  return { memos, loading, refetch }; // 🌟 refetchを外で使えるように返す
 };

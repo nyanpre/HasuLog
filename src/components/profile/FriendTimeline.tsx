@@ -1,13 +1,17 @@
 // src/components/profile/FriendTimeline.tsx
 import { useEffect, useState } from 'react';
-import { Clock, PlayCircle, MessageSquare, Star, Loader2, Sparkles } from 'lucide-react'; // 🌟 Sparklesアイコン追加
-import { collection, getDocs, query, orderBy, limit, doc, getDoc } from 'firebase/firestore';
+import { Clock, PlayCircle, MessageSquare, Star, Loader2, Sparkles } from 'lucide-react';
+import { collection, getDocs, query, orderBy, limit } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { useFriends } from '../../hooks/useFriends';
 import { useAuth } from '../../contexts/AuthContext';
 import { StreamDetailModal } from '../stream/StreamDetailModal';
 import { useUserRecords } from '../../hooks/useUserRecords';
 import type { StreamData } from '../../types';
+
+// 🌟 TODO: あなたの環境に合わせて、フロントエンド化した動画データをインポートしてください
+// 例: import streamsData from '../../data/streams.json';
+const streamsData: StreamData[] = []; // ※仮置き。実際はフロントエンドのデータを使ってください
 
 interface TimelineItem {
   id: string;
@@ -20,6 +24,10 @@ interface TimelineItem {
   lastAction: string;
 }
 
+// 🌟 修正1: キャッシュ期間を 30秒 に変更
+const timelineCache = { data: [] as TimelineItem[], timestamp: 0 };
+const CACHE_DURATION = 30 * 1000; 
+
 export const FriendTimeline = () => {
   const { friends } = useFriends();
   const { currentUser } = useAuth();
@@ -27,30 +35,24 @@ export const FriendTimeline = () => {
   
   const [timeline, setTimeline] = useState<TimelineItem[]>([]);
   const [loading, setLoading] = useState(false);
-  const [globalStreamTitles, setGlobalStreamTitles] = useState<Record<string, string>>({});
   const [selectedStream, setSelectedStream] = useState<StreamData | null>(null);
 
   useEffect(() => {
-    const fetchStreams = async () => {
-      try {
-        const snap = await getDocs(collection(db, "streams"));
-        const titlesObj: Record<string, string> = {};
-        snap.forEach(doc => {
-          titlesObj[doc.id] = doc.data().title;
-        });
-        setGlobalStreamTitles(titlesObj);
-      } catch (error) {
-        console.error("動画タイトルの取得に失敗しました", error);
-      }
-    };
-    fetchStreams();
-  }, []);
+    let isMounted = true; // アンマウント時のエラーを防ぐフラグ
 
-  useEffect(() => {
-    const fetchTimeline = async () => {
+    // isBackgroundフラグで、自動更新時か手動操作時かを判別
+    const fetchTimeline = async (isBackground = false) => {
       if (!currentUser) return;
+
+      // 初回表示時：30秒以内のキャッシュがあれば通信せず即座に表示
+      if (!isBackground && Date.now() - timelineCache.timestamp < CACHE_DURATION && timelineCache.data.length > 0) {
+        if (isMounted) setTimeline(timelineCache.data);
+        return; 
+      }
       
-      setLoading(true);
+      // 裏側の自動更新でなければローディングを表示
+      if (!isBackground) setLoading(true);
+
       try {
         const allLogs: TimelineItem[] = [];
         const targetUsers = [
@@ -83,6 +85,9 @@ export const FriendTimeline = () => {
                 activityTime = new Date(data.lastViewedAt).getTime();
               }
 
+              const localStream = streamsData.find(s => s.id === doc.id);
+              const streamTitle = localStream?.title || data.streamTitle || data.title || '視聴記録';
+
               if (activityTime > 0) {
                 allLogs.push({
                   id: `${user.uid}-${doc.id}`,
@@ -90,7 +95,7 @@ export const FriendTimeline = () => {
                   uid: user.uid,
                   userName: user.uid === currentUser.uid ? 'あなた' : user.displayName,
                   userPhotoURL: user.photoURL,
-                  title: data.streamTitle || data.title || globalStreamTitles[doc.id] || '視聴記録',
+                  title: streamTitle,
                   lastViewedAt: activityTime,
                   lastAction: data.lastAction || 'watch'
                 });
@@ -103,18 +108,39 @@ export const FriendTimeline = () => {
 
         await Promise.all(promises);
         const sortedLogs = allLogs.sort((a, b) => b.lastViewedAt - a.lastViewedAt).slice(0, 20);
-        setTimeline(sortedLogs);
+        
+        // 最新データをキャッシュに上書き保存
+        timelineCache.data = sortedLogs;
+        timelineCache.timestamp = Date.now();
+        
+        // 画面が開かれている場合のみ描画を更新（チラつきなしでスッと変わります）
+        if (isMounted) {
+          setTimeline(sortedLogs);
+        }
+
       } catch (error) {
         console.error("タイムライン取得エラー:", error);
       } finally {
-        setLoading(false);
+        if (isMounted && !isBackground) {
+          setLoading(false);
+        }
       }
     };
 
-    if (Object.keys(globalStreamTitles).length > 0 || timeline.length === 0) {
-      fetchTimeline();
-    }
-  }, [friends, currentUser, globalStreamTitles]);
+    // 🌟 修正2: まず初回ロードを実行
+    fetchTimeline(false);
+
+    // 🌟 修正3: 30秒ごとにバックグラウンドで最新データを取得しにいく
+    const intervalId = setInterval(() => {
+      fetchTimeline(true); // isBackground = true で実行
+    }, CACHE_DURATION);
+
+    // 🌟 修正4: 別の画面に移動したときは、タイマーをストップして通信を止める
+    return () => {
+      isMounted = false;
+      clearInterval(intervalId);
+    };
+  }, [friends, currentUser]);
 
   const getRelativeTime = (timestamp: number) => {
     const now = Date.now();
@@ -129,17 +155,12 @@ export const FriendTimeline = () => {
     return '1ヶ月以上前';
   };
 
-  const handleOpenStreamDetail = async (streamId: string) => {
-    try {
-      const streamDoc = await getDoc(doc(db, "streams", streamId));
-      if (streamDoc.exists()) {
-        setSelectedStream({ id: streamDoc.id, ...streamDoc.data() } as StreamData);
-      } else {
-        alert("動画データが見つかりませんでした。");
-      }
-    } catch (e) {
-      console.error(e);
-      alert("動画データの取得に失敗しました。");
+  const handleOpenStreamDetail = (streamId: string) => {
+    const stream = streamsData.find(s => s.id === streamId);
+    if (stream) {
+      setSelectedStream(stream);
+    } else {
+      alert("動画データが見つかりませんでした。");
     }
   };
 
@@ -164,7 +185,6 @@ export const FriendTimeline = () => {
           ) : (
             <div className="relative border-l-2 border-gray-100 ml-3 pl-5 space-y-5 pb-2">
               {timeline.map((item) => {
-                // 🌟 おすすめ判定を追加
                 const isMemo = item.lastAction === 'memo';
                 const isFav = item.lastAction === 'favorite';
                 const isRecommended = item.lastAction === 'recommended_watch';
@@ -174,7 +194,6 @@ export const FriendTimeline = () => {
                                  : isRecommended ? "が今日のおすすめを視聴しました" 
                                  : "が視聴しました";
                 
-                // おすすめの場合はキラキラアイコン(Sparkles)にする
                 const Icon = isMemo ? MessageSquare : isFav ? Star : isRecommended ? Sparkles : PlayCircle;
                 const iconColor = isMemo ? "text-blue-500" : isFav ? "text-yellow-500" : isRecommended ? "text-emerald-500" : "text-pink-500";
 
