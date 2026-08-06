@@ -1,7 +1,6 @@
 // src/components/pages/Recommendation.tsx
 import { useState, useEffect } from 'react';
-import { collection, getDocs } from 'firebase/firestore';
-import { db } from '../../firebase'; 
+// 🌟 Firestoreのインポートを削除しました
 import { Loader2, Star } from 'lucide-react';
 
 import { StreamCard } from '../stream/StreamCard';
@@ -9,66 +8,71 @@ import { StreamDetailModal } from '../stream/StreamDetailModal';
 import { useUserRecords } from '../../hooks/useUserRecords';
 import { DailyThread } from '../thread/DailyThread';
 import type { StreamData } from '../../types';
+import { useStreams } from '../../contexts/StreamContext';
 
 export default function Recommendation() {
   const { records, updateRecord } = useUserRecords();
+  const { streams, isLoading: isStreamsLoading } = useStreams(); 
   const [recommendedStream, setRecommendedStream] = useState<StreamData | null>(null);
   const [selectedStream, setSelectedStream] = useState<StreamData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const fetchTodayStream = async () => {
-      try {
-        const querySnapshot = await getDocs(collection(db, 'streams'));
-        const streamList = querySnapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        })) as StreamData[];
+    // 🌟 Contextのデータ準備が完了するまで待機
+    if (isStreamsLoading) return;
 
-        if (streamList.length > 0) {
-          // 1. ID順に並び替えて、リストの順番を全ユーザーで統一する
-          streamList.sort((a, b) => a.id.localeCompare(b.id));
+    try {
+      if (streams && streams.length > 0) {
+        // 🌟 重要: sort() は元の配列を書き換えてしまうため、コピーを作成してソートする
+        const streamList = [...streams];
 
-          // 2. 今日の日付文字列を作成
-          const today = new Date();
-          const dateString = `${today.getFullYear()}-${today.getMonth() + 1}-${today.getDate()}`;
-          
-          // 3. 日付からハッシュを計算
-          let hash = 0;
-          for (let i = 0; i < dateString.length; i++) {
-            hash = dateString.charCodeAt(i) + ((hash << 5) - hash);
-          }
-          
-          // 🌟 修正ポイント1: フィルタリング前の「全動画数」を使ってインデックスを計算する（これまで通り）
-          const startIndex = Math.abs(hash) % streamList.length;
-          
-          let selectedIndex = startIndex;
-          let candidate = streamList[selectedIndex];
+        // 1. ID順に並び替えて、リストの順番を全ユーザーで統一する
+        streamList.sort((a, b) => a.id.localeCompare(b.id));
 
-          // 🌟 修正ポイント2: 選ばれた動画に youtubeUrl がない場合のみ、ある動画が見つかるまで次へ進む
-          // （※現在の動画にはURLがあるため、今日はこのループはスキップされ今の動画が維持されます！）
-          while (!candidate.youtubeUrl || candidate.youtubeUrl.trim() === "") {
-            selectedIndex = (selectedIndex + 1) % streamList.length;
-            candidate = streamList[selectedIndex];
-            
-            // 無限ループ防止（万が一すべての動画にURLがない場合のフェイルセーフ）
-            if (selectedIndex === startIndex) {
-              candidate = null as any;
-              break;
-            }
-          }
-          
-          setRecommendedStream(candidate);
+        // 2. 今日の日付文字列を作成
+        const today = new Date();
+        const dateString = `${today.getFullYear()}-${today.getMonth() + 1}-${today.getDate()}`;
+        
+        // 3. 日付からハッシュを計算
+        let hash = 0;
+        for (let i = 0; i < dateString.length; i++) {
+          hash = dateString.charCodeAt(i) + ((hash << 5) - hash);
         }
-      } catch (error) {
-        console.error("データの取得に失敗しました:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
+        
+        // フィルタリング前の「全動画数」を使ってインデックスを計算する
+        let startIndex = Math.abs(hash) % streamList.length;
+        let selectedIndex = startIndex;
+        let candidate = streamList[selectedIndex];
 
-    fetchTodayStream();
-  }, []);
+        // 🌟 パターンB: 2026年8月6日だけ、特定の動画IDを強制表示する特別対応
+        if (dateString === "2026-8-6") {
+           // 表示したい動画のIDをここに入れます
+           const specialStream = streamList.find(s => s.id === "51ce7044-c8d1-4ea5-9b05-865246b4b1d1");
+           if (specialStream) {
+               candidate = specialStream;
+           }
+        }
+
+        // 🌟 選ばれた動画に youtubeUrl がない場合のみ、ある動画が見つかるまで次へ進む
+        while (!candidate.youtubeUrl || candidate.youtubeUrl.trim() === "") {
+          selectedIndex = (selectedIndex + 1) % streamList.length;
+          candidate = streamList[selectedIndex];
+          
+          // 無限ループ防止（万が一すべての動画にURLがない場合のフェイルセーフ）
+          if (selectedIndex === startIndex) {
+            candidate = null as any;
+            break;
+          }
+        }
+        
+        setRecommendedStream(candidate);
+      }
+    } catch (error) {
+      console.error("おすすめ動画の計算に失敗しました:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [streams, isStreamsLoading]); // 🌟 streamsの状態が変わった時に再計算する
 
   return (
     <div className="p-4 relative pb-20">
@@ -77,7 +81,7 @@ export default function Recommendation() {
         <h2 className="text-lg font-bold text-gray-800">今日のおすすめ</h2>
       </div>
 
-      {isLoading ? (
+      {isLoading || isStreamsLoading ? (
         <div className="flex justify-center items-center py-20">
           <Loader2 className="animate-spin text-gray-400" size={32} />
         </div>
