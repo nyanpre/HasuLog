@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef } from 'react';
+// src/components/thread/DailyThread.tsx
+import { useState, useEffect, useRef, useMemo } from 'react'; // 🌟 useMemoを追加
 import { MessageCircle, Send, Clock, User } from 'lucide-react';
 import { collection, query, where, onSnapshot, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../firebase';
@@ -19,12 +20,13 @@ export function DailyThread() {
   const { currentUser } = useAuth();
   const { friends } = useFriends();
   
-  const [comments, setComments] = useState<Comment[]>([]);
+  // 🌟 修正1: 取得した全コメントを保持するステートに変更
+  const [allComments, setAllComments] = useState<Comment[]>([]);
+  
   const [inputText, setInputText] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // 今日の日付文字列（例: "2026-07-30"）を取得
   const getTodayStr = () => {
     const today = new Date();
     return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
@@ -34,8 +36,6 @@ export function DailyThread() {
     if (!currentUser) return;
 
     const todayStr = getTodayStr();
-    
-    // 🌟 今日のコメントだけを取得（インデックス作成エラーを防ぐため、並び替えはJS側で行う）
     const q = query(collection(db, 'dailyComments'), where('dateStr', '==', todayStr));
     
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -44,22 +44,25 @@ export function DailyThread() {
         ...doc.data()
       })) as Comment[];
 
-      // 自分とフレンドのコメントだけに絞り込み、古い順に並び替え
-      const validComments = fetchedComments
-        .filter(c => c.uid === currentUser.uid || friends.some(f => f.uid === c.uid))
-        .sort((a, b) => {
-          const timeA = a.createdAt?.toMillis ? a.createdAt.toMillis() : Date.now();
-          const timeB = b.createdAt?.toMillis ? b.createdAt.toMillis() : Date.now();
-          return timeA - timeB;
-        });
-
-      setComments(validComments);
+      // 🌟 修正2: ここではフィルタリングせず、一旦すべて保存する
+      setAllComments(fetchedComments);
     });
 
     return () => unsubscribe();
-  }, [currentUser, friends]);
+  }, [currentUser]); // 🌟 修正3: 依存配列から friends を削除！これでリスナーは1回しか作られません
 
-  // コメントが追加されたら一番下にスクロール
+  // 🌟 修正4: 表示用のコメントリストを useMemo で作成する
+  // allComments か friends が更新された時だけ、画面表示用にフィルタリングと並び替えを行う
+  const comments = useMemo(() => {
+    return allComments
+      .filter(c => c.uid === currentUser?.uid || friends.some(f => f.uid === c.uid))
+      .sort((a, b) => {
+        const timeA = a.createdAt?.toMillis ? a.createdAt.toMillis() : Date.now();
+        const timeB = b.createdAt?.toMillis ? b.createdAt.toMillis() : Date.now();
+        return timeA - timeB;
+      });
+  }, [allComments, currentUser, friends]);
+
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
@@ -78,7 +81,7 @@ export function DailyThread() {
         photoURL: currentUser.photoURL || '',
         text: inputText.trim(),
         createdAt: serverTimestamp(),
-        dateStr: getTodayStr(), // 今日の日付をタグ付け（明日になれば読み込まれなくなる）
+        dateStr: getTodayStr(), 
       });
       setInputText('');
     } catch (error) {

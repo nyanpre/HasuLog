@@ -15,9 +15,9 @@ export const RankCard = ({ onOpenDashboard }: Props) => {
   
   const prevThreshold = rankInfo.nextAt === 100 ? 0 : 
                         rankInfo.nextAt === 400 ? 100 : 
-                        rankInfo.nextAt === 1500 ? 400 : 
-                        rankInfo.nextAt === 3000 ? 1500 : 
-                        rankInfo.nextAt === 5000 ? 3000 : 5000;
+                        rankInfo.nextAt === 1000 ? 400 : 
+                        rankInfo.nextAt === 2000 ? 1000 : 
+                        rankInfo.nextAt === 3000 ? 2000 : 3000;
   
   const progressPercent = rankInfo.nextAt
     ? Math.min(100, Math.max(0, ((currentPoints - prevThreshold) / (rankInfo.nextAt - prevThreshold)) * 100))
@@ -32,8 +32,7 @@ export const RankCard = ({ onOpenDashboard }: Props) => {
     >
       <div className="flex justify-between items-start mb-6">
         <div>
-          {/* 🌟 テキストを HasuLog ランク に変更 */}
-          <h3 className="text-sm font-bold text-gray-600 mb-1 tracking-wider uppercase">HasuLog ランク</h3>
+          <h3 className="text-sm font-bold text-gray-600 mb-1 tracking-wider">HasuLog ランク</h3>
           <div className="flex items-baseline gap-2">
             <span className={`text-4xl font-black ${rankInfo.color} drop-shadow-sm`}>{rankInfo.rank}</span>
             <span className={`text-sm font-bold opacity-70 ${rankInfo.color}`}>Class</span>

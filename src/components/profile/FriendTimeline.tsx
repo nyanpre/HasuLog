@@ -1,6 +1,6 @@
 // src/components/profile/FriendTimeline.tsx
-import { useEffect, useState } from 'react';
-import { Clock, PlayCircle, MessageSquare, Star, Loader2, Sparkles } from 'lucide-react';
+import { useEffect, useState, useCallback } from 'react';
+import { Clock, PlayCircle, MessageSquare, Star, Loader2, Sparkles, RefreshCw } from 'lucide-react';
 import { collection, getDocs, query, orderBy, limit } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { useFriends } from '../../hooks/useFriends';
@@ -8,10 +8,13 @@ import { useAuth } from '../../contexts/AuthContext';
 import { StreamDetailModal } from '../stream/StreamDetailModal';
 import { useUserRecords } from '../../hooks/useUserRecords';
 import type { StreamData } from '../../types';
+// 🌟 追加: StreamContext から本物の動画データを取得するフックをインポート
+import { useStreams } from '../../contexts/StreamContext';
 
-// 🌟 TODO: あなたの環境に合わせて、フロントエンド化した動画データをインポートしてください
-// 例: import streamsData from '../../data/streams.json';
-const streamsData: StreamData[] = []; // ※仮置き。実際はフロントエンドのデータを使ってください
+// ※仮置きしていた const streamsData = [] は削除しました！
+
+const timelineCache = { data: [] as TimelineItem[], timestamp: 0 };
+const CACHE_DURATION = 5 * 60 * 1000; 
 
 interface TimelineItem {
   id: string;
@@ -24,123 +27,109 @@ interface TimelineItem {
   lastAction: string;
 }
 
-// 🌟 修正1: キャッシュ期間を 30秒 に変更
-const timelineCache = { data: [] as TimelineItem[], timestamp: 0 };
-const CACHE_DURATION = 30 * 1000; 
-
 export const FriendTimeline = () => {
   const { friends } = useFriends();
   const { currentUser } = useAuth();
   const { records: myRecords, updateRecord: myUpdateRecord } = useUserRecords();
   
+  // 🌟 追加: ContextからJSON由来の全動画データを受け取る
+  const { streams: streamsData } = useStreams();
+  
   const [timeline, setTimeline] = useState<TimelineItem[]>([]);
   const [loading, setLoading] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedStream, setSelectedStream] = useState<StreamData | null>(null);
 
-  useEffect(() => {
-    let isMounted = true; // アンマウント時のエラーを防ぐフラグ
+  const fetchTimeline = useCallback(async (forceRefresh = false) => {
+    if (!currentUser) return;
 
-    // isBackgroundフラグで、自動更新時か手動操作時かを判別
-    const fetchTimeline = async (isBackground = false) => {
-      if (!currentUser) return;
+    if (!forceRefresh && Date.now() - timelineCache.timestamp < CACHE_DURATION && timelineCache.data.length > 0) {
+      setTimeline(timelineCache.data);
+      return; 
+    }
+    
+    if (forceRefresh) {
+      setIsRefreshing(true);
+    } else {
+      setLoading(true);
+    }
 
-      // 初回表示時：30秒以内のキャッシュがあれば通信せず即座に表示
-      if (!isBackground && Date.now() - timelineCache.timestamp < CACHE_DURATION && timelineCache.data.length > 0) {
-        if (isMounted) setTimeline(timelineCache.data);
-        return; 
-      }
+    try {
+      const allLogs: TimelineItem[] = [];
+      const targetUsers = [
+        {
+          uid: currentUser.uid,
+          displayName: currentUser.displayName || 'あなた',
+          photoURL: currentUser.photoURL || undefined
+        },
+        ...friends
+      ];
+
+      const promises = targetUsers.map(async (user) => {
+        const recordsRef = collection(db, 'users', user.uid, 'watchHistory');
+        const q = query(recordsRef, orderBy('updatedAt', 'desc'), limit(8)); 
+        
+        try {
+          const snapshot = await getDocs(q);
+          snapshot.forEach((doc) => {
+            const data = doc.data();
+            
+            if (data.lastAction === 'decrease' || data.viewCount === 0) return;
+
+            let activityTime = 0;
+            if (data.updatedAt) {
+              activityTime = typeof data.updatedAt === 'string' 
+                ? new Date(data.updatedAt).getTime() 
+                : (data.updatedAt.toMillis ? data.updatedAt.toMillis() : 0);
+            }
+            if (!activityTime && data.lastViewedAt) {
+              activityTime = new Date(data.lastViewedAt).getTime();
+            }
+
+            // 🌟 ここで Context から受け取った本物の streamsData を使ってタイトルを探します
+            const localStream = streamsData.find(s => s.id === doc.id);
+            const streamTitle = localStream?.title || data.streamTitle || data.title || '視聴記録';
+
+            if (activityTime > 0) {
+              allLogs.push({
+                id: `${user.uid}-${doc.id}`,
+                streamId: doc.id,
+                uid: user.uid,
+                userName: user.uid === currentUser.uid ? 'あなた' : user.displayName,
+                userPhotoURL: user.photoURL,
+                title: streamTitle,
+                lastViewedAt: activityTime,
+                lastAction: data.lastAction || 'watch'
+              });
+            }
+          });
+        } catch (err) {
+          console.warn(`${user.displayName}の履歴取得に失敗しました`, err);
+        }
+      });
+
+      await Promise.all(promises);
+      const sortedLogs = allLogs.sort((a, b) => b.lastViewedAt - a.lastViewedAt).slice(0, 20);
       
-      // 裏側の自動更新でなければローディングを表示
-      if (!isBackground) setLoading(true);
+      timelineCache.data = sortedLogs;
+      timelineCache.timestamp = Date.now();
+      
+      setTimeline(sortedLogs);
 
-      try {
-        const allLogs: TimelineItem[] = [];
-        const targetUsers = [
-          {
-            uid: currentUser.uid,
-            displayName: currentUser.displayName || 'あなた',
-            photoURL: currentUser.photoURL || undefined
-          },
-          ...friends
-        ];
+    } catch (error) {
+      console.error("タイムライン取得エラー:", error);
+    } finally {
+      setLoading(false);
+      setIsRefreshing(false);
+    }
+  }, [currentUser, friends, streamsData]); // 🌟 依存配列に streamsData を追加
 
-        const promises = targetUsers.map(async (user) => {
-          const recordsRef = collection(db, 'users', user.uid, 'watchHistory');
-          const q = query(recordsRef, orderBy('updatedAt', 'desc'), limit(8)); 
-          
-          try {
-            const snapshot = await getDocs(q);
-            snapshot.forEach((doc) => {
-              const data = doc.data();
-              
-              if (data.lastAction === 'decrease' || data.viewCount === 0) return;
-
-              let activityTime = 0;
-              if (data.updatedAt) {
-                activityTime = typeof data.updatedAt === 'string' 
-                  ? new Date(data.updatedAt).getTime() 
-                  : (data.updatedAt.toMillis ? data.updatedAt.toMillis() : 0);
-              }
-              if (!activityTime && data.lastViewedAt) {
-                activityTime = new Date(data.lastViewedAt).getTime();
-              }
-
-              const localStream = streamsData.find(s => s.id === doc.id);
-              const streamTitle = localStream?.title || data.streamTitle || data.title || '視聴記録';
-
-              if (activityTime > 0) {
-                allLogs.push({
-                  id: `${user.uid}-${doc.id}`,
-                  streamId: doc.id,
-                  uid: user.uid,
-                  userName: user.uid === currentUser.uid ? 'あなた' : user.displayName,
-                  userPhotoURL: user.photoURL,
-                  title: streamTitle,
-                  lastViewedAt: activityTime,
-                  lastAction: data.lastAction || 'watch'
-                });
-              }
-            });
-          } catch (err) {
-            console.warn(`${user.displayName}の履歴取得に失敗しました`, err);
-          }
-        });
-
-        await Promise.all(promises);
-        const sortedLogs = allLogs.sort((a, b) => b.lastViewedAt - a.lastViewedAt).slice(0, 20);
-        
-        // 最新データをキャッシュに上書き保存
-        timelineCache.data = sortedLogs;
-        timelineCache.timestamp = Date.now();
-        
-        // 画面が開かれている場合のみ描画を更新（チラつきなしでスッと変わります）
-        if (isMounted) {
-          setTimeline(sortedLogs);
-        }
-
-      } catch (error) {
-        console.error("タイムライン取得エラー:", error);
-      } finally {
-        if (isMounted && !isBackground) {
-          setLoading(false);
-        }
-      }
-    };
-
-    // 🌟 修正2: まず初回ロードを実行
-    fetchTimeline(false);
-
-    // 🌟 修正3: 30秒ごとにバックグラウンドで最新データを取得しにいく
-    const intervalId = setInterval(() => {
-      fetchTimeline(true); // isBackground = true で実行
-    }, CACHE_DURATION);
-
-    // 🌟 修正4: 別の画面に移動したときは、タイマーをストップして通信を止める
-    return () => {
-      isMounted = false;
-      clearInterval(intervalId);
-    };
-  }, [friends, currentUser]);
+  useEffect(() => {
+    // 🌟 streamsData が空の間（読み込み中）は実行を待つ
+    if (streamsData.length > 0) {
+      fetchTimeline();
+    }
+  }, [fetchTimeline, streamsData.length]);
 
   const getRelativeTime = (timestamp: number) => {
     const now = Date.now();
@@ -156,6 +145,7 @@ export const FriendTimeline = () => {
   };
 
   const handleOpenStreamDetail = (streamId: string) => {
+    // 🌟 本物の streamsData からデータを検索する
     const stream = streamsData.find(s => s.id === streamId);
     if (stream) {
       setSelectedStream(stream);
@@ -167,10 +157,20 @@ export const FriendTimeline = () => {
   return (
     <>
       <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm h-full flex flex-col min-h-[350px]">
-        <h3 className="text-sm font-bold text-gray-800 mb-5 flex items-center">
-          <Clock className="w-4 h-4 mr-2 text-blue-500" />
-          みんなのアクティビティ
-        </h3>
+        <div className="flex justify-between items-center mb-5">
+          <h3 className="text-sm font-bold text-gray-800 flex items-center">
+            <Clock className="w-4 h-4 mr-2 text-blue-500" />
+            みんなのアクティビティ
+          </h3>
+          <button
+            onClick={() => fetchTimeline(true)}
+            disabled={loading || isRefreshing}
+            className="p-1.5 text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded-full transition-all disabled:opacity-50"
+            title="最新のアクティビティを取得"
+          >
+            <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin text-blue-500' : ''}`} />
+          </button>
+        </div>
 
         <div className="flex-grow overflow-y-auto custom-scrollbar pr-2">
           {loading ? (
