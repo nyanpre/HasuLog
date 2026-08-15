@@ -1,8 +1,10 @@
 // src/components/pages/Recommendation.tsx
 import { useState, useEffect } from 'react';
-// 🌟 Firestoreのインポートを削除しました
-import { Loader2, Star } from 'lucide-react';
+// 🌟 管理用ドキュメントを読み書きするための必要最小限のインポートのみ残しています
+import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { db } from '../../firebase'; 
 
+import { Loader2, Star } from 'lucide-react';
 import { StreamCard } from '../stream/StreamCard';
 import { StreamDetailModal } from '../stream/StreamDetailModal';
 import { useUserRecords } from '../../hooks/useUserRecords';
@@ -17,62 +19,73 @@ export default function Recommendation() {
   const [selectedStream, setSelectedStream] = useState<StreamData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  // 今日の日付文字列を取得（例: "2026-08-16"）
+  const getTodayStr = () => {
+    const today = new Date();
+    return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+  };
+
   useEffect(() => {
-    // 🌟 Contextのデータ準備が完了するまで待機
     if (isStreamsLoading) return;
 
-    try {
-      if (streams && streams.length > 0) {
-        // 🌟 重要: sort() は元の配列を書き換えてしまうため、コピーを作成してソートする
-        const streamList = [...streams];
-
-        // 1. ID順に並び替えて、リストの順番を全ユーザーで統一する
-        streamList.sort((a, b) => a.id.localeCompare(b.id));
-
-        // 2. 今日の日付文字列を作成
-        const today = new Date();
-        const dateString = `${today.getFullYear()}-${today.getMonth() + 1}-${today.getDate()}`;
-        
-        // 3. 日付からハッシュを計算
-        let hash = 0;
-        for (let i = 0; i < dateString.length; i++) {
-          hash = dateString.charCodeAt(i) + ((hash << 5) - hash);
-        }
-        
-        // フィルタリング前の「全動画数」を使ってインデックスを計算する
-        let startIndex = Math.abs(hash) % streamList.length;
-        let selectedIndex = startIndex;
-        let candidate = streamList[selectedIndex];
-
-        // 🌟 パターンB: 2026年8月6日だけ、特定の動画IDを強制表示する特別対応
-        if (dateString === "2026-8-6") {
-           // 表示したい動画のIDをここに入れます
-           const specialStream = streamList.find(s => s.id === "51ce7044-c8d1-4ea5-9b05-865246b4b1d1");
-           if (specialStream) {
-               candidate = specialStream;
-           }
+    const fetchTodayRecommendation = async () => {
+      try {
+        const validStreams = streams.filter(s => s.youtubeUrl && s.youtubeUrl.trim() !== "");
+        if (validStreams.length === 0) {
+          setRecommendedStream(null);
+          return;
         }
 
-        // 🌟 選ばれた動画に youtubeUrl がない場合のみ、ある動画が見つかるまで次へ進む
-        while (!candidate.youtubeUrl || candidate.youtubeUrl.trim() === "") {
-          selectedIndex = (selectedIndex + 1) % streamList.length;
-          candidate = streamList[selectedIndex];
-          
-          // 無限ループ防止（万が一すべての動画にURLがない場合のフェイルセーフ）
-          if (selectedIndex === startIndex) {
-            candidate = null as any;
-            break;
+        const todayStr = getTodayStr();
+        
+        // Firestoreの「system/recommendation」というたった1つのファイルを読みに行く
+        const recRef = doc(db, 'system', 'recommendation');
+        const recSnap = await getDoc(recRef);
+        const recData = recSnap.exists() ? recSnap.data() : { date: '', streamId: '', shownIds: [] };
+
+        // パターンA: 既に「今日の動画」がFirestoreに記録されている場合は、それを表示するだけ
+        if (recData.date === todayStr && recData.streamId) {
+          const stream = validStreams.find(s => s.id === recData.streamId);
+          if (stream) {
+            setRecommendedStream(stream);
+            return;
           }
         }
+
+        // パターンB: 日付が変わって「最初の1人目」だった場合、新しい動画を選んで記録する
+        let shownIds: string[] = recData.shownIds || [];
         
+        // まだ選ばれていない動画を絞り込む
+        let unshownStreams = validStreams.filter(s => !shownIds.includes(s.id));
+
+        // もし全部選ばれ尽くしていたらリストをリセットしてループする
+        if (unshownStreams.length === 0) {
+          shownIds = [];
+          unshownStreams = validStreams;
+        }
+
+        // まだ選ばれていないものの中からランダムに1つ選ぶ
+        const randomIndex = Math.floor(Math.random() * unshownStreams.length);
+        const candidate = unshownStreams[randomIndex];
+
+        // 選んだ動画と、過去の履歴をFirestoreに「上書き保存」する
+        await setDoc(recRef, {
+          date: todayStr,
+          streamId: candidate.id,
+          shownIds: [...shownIds, candidate.id]
+        });
+
         setRecommendedStream(candidate);
+
+      } catch (error) {
+        console.error("おすすめ動画の計算・取得に失敗しました:", error);
+      } finally {
+        setIsLoading(false);
       }
-    } catch (error) {
-      console.error("おすすめ動画の計算に失敗しました:", error);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [streams, isStreamsLoading]); // 🌟 streamsの状態が変わった時に再計算する
+    };
+
+    fetchTodayRecommendation();
+  }, [streams, isStreamsLoading]);
 
   return (
     <div className="p-4 relative pb-20">
