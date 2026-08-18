@@ -1,6 +1,6 @@
 // src/components/pages/Profile.tsx
 import { useState, useEffect } from 'react';
-import { User } from 'lucide-react';
+import { User, LogOut } from 'lucide-react'; // 🌟 LogOutアイコンを追加
 import { useAuth } from '../../contexts/AuthContext';
 import { auth, db } from '../../firebase';
 import { signOut, updateProfile } from 'firebase/auth';
@@ -26,6 +26,8 @@ export default function Profile() {
   const [friendId, setFriendId] = useState<string>("");
   const [showDashboard, setShowDashboard] = useState<boolean>(false);
 
+  const isAnonymous = currentUser?.isAnonymous || false;
+
   useEffect(() => {
     const fetchUserProfile = async () => {
       if (currentUser) {
@@ -47,20 +49,24 @@ export default function Profile() {
           if (currentData.friendId) {
             setFriendId(currentData.friendId);
           } else {
-            const newFriendId = Math.floor(10000000 + Math.random() * 90000000).toString();
-            updates.friendId = newFriendId;
-            needsUpdate = true;
-            setFriendId(newFriendId);
-            
-            if (!currentData.displayName) {
-              updates.displayName = currentUser.displayName || "名無しさん";
-            }
-            if (currentUser.photoURL && !currentData.photoURL) {
-              updates.photoURL = currentUser.photoURL;
+            if (!isAnonymous) {
+              const newFriendId = Math.floor(10000000 + Math.random() * 90000000).toString();
+              updates.friendId = newFriendId;
+              needsUpdate = true;
+              setFriendId(newFriendId);
+              
+              if (!currentData.displayName) {
+                updates.displayName = currentUser.displayName || "名無しさん";
+              }
+              if (currentUser.photoURL && !currentData.photoURL) {
+                updates.photoURL = currentUser.photoURL;
+              }
+            } else {
+              setFriendId("未登録(ゲスト)");
             }
           }
 
-          if (needsUpdate) {
+          if (needsUpdate && !isAnonymous) {
             await setDoc(userDocRef, updates, { merge: true });
           }
         } catch (error) {
@@ -69,7 +75,7 @@ export default function Profile() {
       }
     };
     fetchUserProfile();
-  }, [currentUser]);
+  }, [currentUser, isAnonymous]);
 
   useEffect(() => {
     const fetchMeetsTitles = async () => {
@@ -92,8 +98,9 @@ export default function Profile() {
   }, []);
 
   const handleSaveProfile = async (newName: string, newProfileData: UserProfileData, newPhotoUrl?: string) => {
+    if (!currentUser || isAnonymous) return;
+    
     try {
-      if (!currentUser) return;
       const authUpdates: any = {};
       if (newName !== currentUser.displayName) authUpdates.displayName = newName;
       if (newPhotoUrl !== undefined && newPhotoUrl !== currentUser.photoURL) authUpdates.photoURL = newPhotoUrl;
@@ -136,17 +143,37 @@ export default function Profile() {
         </h2>
       </div>
 
-      <ProfileCard 
-        profileData={profileData}
-        meetsOptions={meetsOptions}
-        onSave={handleSaveProfile}
-        onLogout={handleLogout}
-      />
+      {/* 🌟 変更: ゲストユーザーには警告メッセージと専用のログアウトボタンを表示 */}
+      {isAnonymous && (
+        <div className="bg-gray-100 p-5 rounded-xl text-center text-sm text-gray-600 font-bold border border-gray-200 shadow-sm flex flex-col items-center gap-4">
+          <p className="leading-relaxed">
+            🔒 プロフィールの編集やフレンド機能を利用するには、<br />
+            Googleアカウントでのログインが必要です。
+          </p>
+          <button 
+            onClick={handleLogout}
+            className="flex items-center gap-2 px-5 py-2.5 bg-white border border-gray-300 text-gray-700 rounded-lg shadow-sm hover:bg-gray-50 transition-colors pointer-events-auto"
+          >
+            <LogOut size={16} />
+            ログアウトしてログイン画面に戻る
+          </button>
+        </div>
+      )}
+
+      {/* ゲストの時はProfileCard自体を触れないようにガード */}
+      <div className={isAnonymous ? "opacity-60 pointer-events-none select-none" : ""}>
+        <ProfileCard 
+          profileData={profileData}
+          meetsOptions={meetsOptions}
+          onSave={handleSaveProfile}
+          onLogout={handleLogout}
+        />
+      </div>
 
       <RankCard onOpenDashboard={() => setShowDashboard(true)} />
 
-      {/* 🌟 ダミーデータを消して本物のコンポーネントを配置 */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+      {/* ゲストの時はフレンド機能などを隠す（半透明にしてガード） */}
+      <div className={`grid grid-cols-1 md:grid-cols-2 gap-6 items-start ${isAnonymous ? "opacity-60 pointer-events-none select-none" : ""}`}>
         <FriendRankComparison />
         <FriendList friendId={friendId} />
       </div>

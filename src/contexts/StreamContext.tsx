@@ -6,6 +6,7 @@ import type { StreamData } from '../types';
 // 🌟 JSONデータをフロントエンドに直接インポート！
 import withmeetsData from '../data/withmeets_wiki_data.json';
 import withstationData from '../data/withstation_wiki_data.json';
+import fesliveData from '../data/feslive_wiki_data.json'; // 🌟 追加: Fes×LIVEデータ
 
 type StreamContextType = {
   streams: StreamData[];
@@ -22,10 +23,11 @@ export const StreamProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     try {
-      // 1. 2つのJSONデータを合体させる
+      // 1. 3つのJSONデータを合体させる (🌟 fesliveData を追加)
       const allStreams = [
         ...(withmeetsData as StreamData[]),
-        ...(withstationData as StreamData[])
+        ...(withstationData as StreamData[]),
+        ...(fesliveData as StreamData[])
       ];
       
       // 2. 日付の新しい順（降順）に並び替え

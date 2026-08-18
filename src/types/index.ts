@@ -1,5 +1,4 @@
 // src/types/index.ts
-// (既存の StreamData や VideoData はそのまま残しておいてください)
 
 export interface StreamData {
   id: string;
@@ -11,7 +10,9 @@ export interface StreamData {
   youtubeUrl: string;
   thumbnailUrl: string;
   description: string;
+  raw_title_node?: string; // 🌟 Pythonスクリプトの出力合わせ
   is_official?: boolean;
+  extraYoutubeUrls?: { label: string; url: string }[]; // 🌟 StreamDataにも追加！
 }
 
 export interface VideoData {
@@ -24,6 +25,7 @@ export interface VideoData {
   participants?: string;
   description?: string;
   isWatched?: boolean;
+  extraYoutubeUrls?: { label: string; url: string }[];
 }
 
 // 🌟 今回新しく追加するプロフィール用の型

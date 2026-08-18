@@ -161,6 +161,8 @@ export const StreamList = () => {
                 <option value="all">すべての配信</option>
                 <option value="with_meets">With×MEETS</option>
                 <option value="with_station">With×STATION</option>
+                {/* 🌟 変更: Fes×LIVE のフィルターを追加 */}
+                <option value="fes_live">Fes×LIVE</option>
               </select>
 
               {/* 視聴状態のフィルターUI */}

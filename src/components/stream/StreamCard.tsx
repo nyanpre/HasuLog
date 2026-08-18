@@ -10,10 +10,8 @@ type Props = {
   columns: 1 | 2 | 4;
   viewCount: number;
   onClick: () => void;
-  // 🌟 不要になった onUpdateViewCount を削除しました
 };
 
-// 🌟 受け取る引数からも onUpdateViewCount を削除しました
 export const StreamCard = ({ stream, columns, viewCount, onClick }: Props) => {
   const { currentUser } = useAuth();
   
@@ -42,6 +40,19 @@ export const StreamCard = ({ stream, columns, viewCount, onClick }: Props) => {
     }
   };
 
+  // 🌟 バッジの出し分け（Fes×LIVE対応）
+  const getBadgeInfo = () => {
+    if (stream.type === "with_meets") {
+      return { text: "MEETS", bg: "bg-pink-500" };
+    }
+    if (stream.type === "fes_live") {
+      return { text: "Fes×LIVE", bg: "bg-emerald-500" };
+    }
+    return { text: "STATION", bg: "bg-blue-500" };
+  };
+
+  const badge = getBadgeInfo();
+
   return (
     <div 
       onClick={onClick}
@@ -57,10 +68,8 @@ export const StreamCard = ({ stream, columns, viewCount, onClick }: Props) => {
         ) : (
           <div className="w-full h-full flex items-center justify-center text-gray-400 text-xs">No Image</div>
         )}
-        <span className={`absolute top-1 left-1 sm:top-2 sm:left-2 text-white px-1.5 py-0.5 rounded text-[9px] sm:text-[10px] font-bold ${
-          stream.type === "with_meets" ? "bg-pink-500" : "bg-blue-500"
-        }`}>
-          {stream.type === "with_meets" ? "MEETS" : "STATION"}
+        <span className={`absolute top-1 left-1 sm:top-2 sm:left-2 text-white px-1.5 py-0.5 rounded text-[9px] sm:text-[10px] font-bold ${badge.bg}`}>
+          {badge.text}
         </span>
       </div>
 
@@ -95,7 +104,7 @@ export const StreamCard = ({ stream, columns, viewCount, onClick }: Props) => {
               onClick={(e) => handleOpenConfirm('decrease', e)}
               className="px-2.5 py-0.5 sm:py-1 text-gray-600 hover:bg-gray-200 transition-colors"
             >−</button>
-            <span className="px-2 py-0.5 sm:py-1 text-[10px] sm:text-xs text-gray-700 border-x border-gray-300 min-w-[5.5rem] text-center font-medium bg-white">
+            <span className="px-2.5 py-0.5 sm:py-1 text-[10px] sm:text-xs text-gray-700 border-x border-gray-300 min-w-[5.5rem] text-center font-medium bg-white">
               視聴回数：{viewCount}
             </span>
             <button 

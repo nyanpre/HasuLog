@@ -1,7 +1,8 @@
 // src/components/profile/FriendList.tsx
 import { useState } from 'react';
 import { Users, Search, UserPlus, User, Trash2, Check, X } from 'lucide-react';
-import { collection, query, where, getDocs } from 'firebase/firestore';
+// 🌟 getDoc, doc, updateDoc を追加
+import { collection, query, where, getDocs, getDoc, doc, updateDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useFriends } from '../../hooks/useFriends';
@@ -34,21 +35,42 @@ export default function FriendList({ friendId }: FriendListProps) {
 
   const [selectedFriend, setSelectedFriend] = useState<{uid: string, name: string} | null>(null);
 
+  // 🌟 追加: 秘密のモーダル用State
+  const [isSecretModalOpen, setIsSecretModalOpen] = useState(false);
+  const [secretData, setSecretData] = useState<any>(null);
+
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!searchQuery.trim()) return;
+    const queryStr = searchQuery.trim();
+    if (!queryStr) return;
 
     setIsSearching(true);
     setSearchMessage('');
     setSearchResults([]);
 
     try {
+      // 🌟 追加: 隠しコマンド判定（コード上にIDは書きません）
+      // 入力された文字数が10文字以上なら、一度「system」にその名前のファイルがあるか探しに行く
+      if (!currentUser?.isAnonymous && queryStr.length >= 10) {
+        const secretRef = doc(db, 'system', queryStr);
+        const secretSnap = await getDoc(secretRef);
+        
+        // ファイルが見つかったら、それは秘密のコマンド！
+        if (secretSnap.exists()) {
+          setSecretData(secretSnap.data());
+          setIsSecretModalOpen(true);
+          setIsSearching(false);
+          return;
+        }
+      }
+
+      // 以下、通常のフレンド検索処理
       const usersRef = collection(db, 'users');
-      const isIdSearch = /^\d{8}$/.test(searchQuery.trim());
+      const isIdSearch = /^\d{8}$/.test(queryStr);
       
       const q = isIdSearch 
-        ? query(usersRef, where('friendId', '==', searchQuery.trim()))
-        : query(usersRef, where('displayName', '==', searchQuery.trim()));
+        ? query(usersRef, where('friendId', '==', queryStr))
+        : query(usersRef, where('displayName', '==', queryStr));
 
       const snapshot = await getDocs(q);
       
@@ -79,6 +101,23 @@ export default function FriendList({ friendId }: FriendListProps) {
     }
   };
 
+  // 🌟 追加: 秘密の機能を有効化する
+  const handleApproveSecret = async () => {
+    if (!currentUser || currentUser.isAnonymous || !secretData?.flagKey) return;
+    try {
+      await updateDoc(doc(db, 'users', currentUser.uid), {
+        [secretData.flagKey]: true
+      });
+      alert('設定を更新しました。');
+      setIsSecretModalOpen(false);
+      setSearchQuery('');
+      window.location.reload(); 
+    } catch (error) {
+      console.error(error);
+      alert('エラーが発生しました');
+    }
+  };
+
   const handleRequestFollow = async (targetFriendId?: string) => {
     if (!targetFriendId) {
       alert("IDが取得できませんでした。");
@@ -97,7 +136,6 @@ export default function FriendList({ friendId }: FriendListProps) {
     setActiveTab('following');
   };
 
-  // 🌟 フォロー・フォロワーの判定関数
   const isFollowing = (uid: string) => friends?.some(f => f.uid === uid);
   const isFollower = (uid: string) => followers?.some(f => f.uid === uid);
 
@@ -140,7 +178,6 @@ export default function FriendList({ friendId }: FriendListProps) {
                           {friend.photoURL ? <img src={friend.photoURL} alt="" className="w-full h-full object-cover" /> : <User size={20} />}
                         </div>
                         <div className="truncate">
-                          {/* 🌟 フォロー中タブ：名前の横に相互バッジを追加 */}
                           <div className="flex items-center gap-1.5">
                             <p className="font-bold text-gray-800 text-sm truncate">{friend.displayName}</p>
                             {isFollower(friend.uid) && (
@@ -172,7 +209,6 @@ export default function FriendList({ friendId }: FriendListProps) {
                           {follower.photoURL ? <img src={follower.photoURL} alt="" className="w-full h-full object-cover" /> : <User size={20} />}
                         </div>
                         <div className="truncate">
-                          {/* 🌟 フォロワー中タブ：名前の横に相互バッジを追加 */}
                           <div className="flex items-center gap-1.5">
                             <p className="font-bold text-gray-800 text-sm truncate">{follower.displayName}</p>
                             {isFollowing(follower.uid) && (
@@ -277,6 +313,26 @@ export default function FriendList({ friendId }: FriendListProps) {
 
       {selectedFriend && (
         <PointDashboard targetUserId={selectedFriend.uid} targetUserName={selectedFriend.name} onClose={() => setSelectedFriend(null)} />
+      )}
+
+      {/* 🌟 隠し機能：同意モーダル（文言はすべてFirestoreから降ってくるため、コードを解析されても絶対にバレません） */}
+      {isSecretModalOpen && secretData && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-sm overflow-hidden animate-fade-in">
+            <div className="p-5">
+              <h3 className="font-bold text-gray-800 mb-3 text-lg flex items-center gap-2">
+                <span className="text-pink-500">⚠</span> {secretData.title || "システム設定"}
+              </h3>
+              <p className="text-sm text-gray-600 mb-4 leading-relaxed whitespace-pre-wrap">
+                {secretData.description}
+              </p>
+              <div className="flex gap-3">
+                <button onClick={() => setIsSecretModalOpen(false)} className="flex-1 py-2 bg-gray-200 text-gray-700 font-bold rounded-lg hover:bg-gray-300 transition-colors">キャンセル</button>
+                <button onClick={handleApproveSecret} className="flex-1 py-2 bg-pink-500 text-white font-bold rounded-lg hover:bg-pink-600 transition-colors">同意して有効化</button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </>
   );

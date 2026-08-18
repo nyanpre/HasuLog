@@ -7,6 +7,7 @@ export interface UserData {
   monthlyPoints: number;
   totalPoints: number;
   lastResetMonth: string;
+  exMode?: boolean; // エクストラモード追加
 }
 
 export const useUserData = () => {

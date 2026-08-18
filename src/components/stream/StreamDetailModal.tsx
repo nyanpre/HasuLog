@@ -5,6 +5,7 @@ import { useAuth } from "../../contexts/AuthContext";
 import { addWatchRecord, removeWatchRecord } from "../../utils/pointSystem";
 import { WatchConfirmModal } from "../common/WatchConfirmModal";
 import { usePublicMemos } from "../../hooks/usePublicMemos";
+import { useUserData } from "../../hooks/useUserData";
 import type { StreamData } from "../../types";
 import type { StreamRecord } from "../../hooks/useUserRecords";
 
@@ -18,11 +19,13 @@ type Props = {
 
 export const StreamDetailModal = ({ stream, record, onClose, onUpdateRecord, isRecommended = false }: Props) => {
   const { currentUser } = useAuth();
+  const { userData } = useUserData();
   const [localMemo, setLocalMemo] = useState("");
   const [visibility, setVisibility] = useState<'private' | 'public_anonymous' | 'public_named'>('private');
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "success">("idle");
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [actionMode, setActionMode] = useState<'youtube' | 'increase' | 'decrease'>('youtube');
+  const [targetUrl, setTargetUrl] = useState<string>("");
 
   const { memos: publicMemos, loading: memosLoading, refetch: refetchMemos } = usePublicMemos(stream?.id);
   
@@ -47,7 +50,6 @@ export const StreamDetailModal = ({ stream, record, onClose, onUpdateRecord, isR
       });
       setSaveStatus("success");
       
-      // 🌟 追加: 保存が完了したら、最新のメモ一覧を取得し直して表示を即時反映する
       refetchMemos(); 
       
       setTimeout(() => setSaveStatus("idle"), 2000);
@@ -68,7 +70,8 @@ export const StreamDetailModal = ({ stream, record, onClose, onUpdateRecord, isR
     });
   };
 
-  const handleOpenYoutubeConfirm = () => {
+  const handleOpenYoutubeConfirm = (url: string) => {
+    setTargetUrl(url);
     setActionMode('youtube');
     setIsConfirmOpen(true);
   };
@@ -85,12 +88,10 @@ export const StreamDetailModal = ({ stream, record, onClose, onUpdateRecord, isR
     }
   };
 
-  // 🌟 修正ポイント1: asyncを外し、待たずにすぐYouTubeを開く（フリーズ回避）
   const handleConfirmWatch = () => {
     setIsConfirmOpen(false);
 
-    if (currentUser && stream) {
-      // データベースへの記録は裏側で勝手にやらせる (awaitしない)
+    if (currentUser && !currentUser.isAnonymous && stream) {
       if (actionMode === 'decrease') {
         removeWatchRecord(currentUser.uid, stream.id, stream.title).catch(console.error);
       } else {
@@ -98,18 +99,55 @@ export const StreamDetailModal = ({ stream, record, onClose, onUpdateRecord, isR
       }
     }
 
-    // ユーザーのクリック直後なので、ブロックされずに100%開く
-    if (actionMode === 'youtube' && stream && stream.youtubeUrl) {
-      window.open(stream.youtubeUrl, "_blank", "noopener,noreferrer");
+    if (actionMode === 'youtube' && targetUrl) {
+      window.open(targetUrl, "_blank", "noopener,noreferrer");
     }
   };
 
   const handleSkipWatch = () => {
     setIsConfirmOpen(false);
-    if (actionMode === 'youtube' && stream && stream.youtubeUrl) {
-      window.open(stream.youtubeUrl, "_blank", "noopener,noreferrer");
+    if (actionMode === 'youtube' && targetUrl) {
+      window.open(targetUrl, "_blank", "noopener,noreferrer");
     } 
   };
+
+  // 🌟 公式・非公式とexModeの判定を安全に強化
+  const isOfficialStream = stream ? (stream.is_official !== false && (stream.is_official as any) !== "false") : false;
+
+  const canShowYoutubeLink = () => {
+    if (!stream) return false;
+    // 公式動画なら誰でも閲覧可能
+    if (isOfficialStream) return true;
+    // 非公式動画の場合は exMode ユーザーのみ閲覧可能
+    return userData?.exMode === true;
+  };
+
+  // extraYoutubeUrls の正規化
+  const getNormalizedExtraUrls = (): { label: string; url: string }[] => {
+    if (!stream || !stream.extraYoutubeUrls) return [];
+    
+    if (typeof stream.extraYoutubeUrls === 'string') {
+      const url = (stream.extraYoutubeUrls as string).trim();
+      return url ? [{ label: '第二部', url }] : [];
+    }
+
+    if (Array.isArray(stream.extraYoutubeUrls)) {
+      return stream.extraYoutubeUrls.map((item: any, idx: number) => {
+        if (typeof item === 'string') {
+          return { label: `第二部`, url: item };
+        }
+        return {
+          label: item.label || `第二部`,
+          url: item.url || ''
+        };
+      }).filter(item => item.url);
+    }
+
+    return [];
+  };
+
+  const extraUrls = getNormalizedExtraUrls();
+  const hasMultipleUrls = extraUrls.length > 0;
 
   return (
     <>
@@ -155,7 +193,8 @@ export const StreamDetailModal = ({ stream, record, onClose, onUpdateRecord, isR
                     </h2>
                     <button 
                       onClick={toggleFavorite}
-                      className={`flex-shrink-0 text-2xl transition-transform hover:scale-110 ${record?.isFavorite ? "text-yellow-400" : "text-gray-300"}`}
+                      className={`flex-shrink-0 text-2xl transition-transform hover:scale-110 ${record?.isFavorite ? "text-yellow-400" : "text-gray-300"} ${currentUser?.isAnonymous ? "opacity-50 cursor-not-allowed" : ""}`}
+                      disabled={currentUser?.isAnonymous}
                       title={record?.isFavorite ? "お気に入りを解除" : "お気に入りに追加"}
                     >
                       {record?.isFavorite ? "★" : "☆"}
@@ -173,69 +212,97 @@ export const StreamDetailModal = ({ stream, record, onClose, onUpdateRecord, isR
                     </p>
                   </div>
 
-                  {stream.youtubeUrl && stream.youtubeUrl !== "" && (
-                    <button 
-                      onClick={handleOpenYoutubeConfirm}
-                      className="flex items-center justify-center w-full bg-red-600 hover:bg-red-700 text-white font-bold py-2.5 px-4 rounded-lg mb-6 shadow-sm text-sm transition-colors active:scale-[0.98]"
-                    >
-                      YouTubeで開く
-                      <span className="ml-2 text-xs font-normal text-white/70">
-                        {stream.is_official === true ? "(公式)" : "(非公式)"}
-                      </span>
-                    </button>
+                  {/* 🌟 メインボタン ＆ サブボタン */}
+                  {stream.youtubeUrl && stream.youtubeUrl !== "" && canShowYoutubeLink() && (
+                    <div className="flex flex-col gap-2 mb-6">
+                      {/* メインボタン（URLが2つある場合は【第一部】表記） */}
+                      <button 
+                        onClick={() => handleOpenYoutubeConfirm(stream.youtubeUrl)}
+                        className="flex items-center justify-center w-full bg-red-600 hover:bg-red-700 text-white font-bold py-2.5 px-4 rounded-lg shadow-sm text-sm transition-colors active:scale-[0.98]"
+                      >
+                        {hasMultipleUrls ? "YouTubeで開く【第一部】" : "YouTubeで開く"}
+                        <span className="ml-2 text-xs font-normal text-white/70">
+                          {isOfficialStream ? "(公式)" : "(非公式)"}
+                        </span>
+                      </button>
+
+                      {/* サブボタン（【第二部】表記） */}
+                      {hasMultipleUrls && (
+                        extraUrls.map((extra, idx) => (
+                          <button 
+                            key={idx}
+                            onClick={() => handleOpenYoutubeConfirm(extra.url)}
+                            className="flex items-center justify-center w-full bg-red-600 hover:bg-red-700 text-white font-bold py-2.5 px-4 rounded-lg shadow-sm text-sm transition-colors active:scale-[0.98]"
+                          >
+                            YouTubeで開く【第二部】
+                            <span className="ml-2 text-xs font-normal text-white/70">
+                              {isOfficialStream ? "(公式)" : "(非公式)"}
+                            </span>
+                          </button>
+                        ))
+                      )}
+                    </div>
                   )}
 
-                  <div className="border-t border-gray-200 pt-4 pb-2 mt-2">
-                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-3 gap-3">
-                      <div className="flex items-center gap-2">
-                        <h4 className="text-xs sm:text-sm font-bold text-gray-800">視聴メモ</h4>
-                        {record?.updatedAt && (
-                          <span className="text-[10px] text-gray-400 font-medium">
-                            (最終更新: {new Date(record.updatedAt).toLocaleDateString('ja-JP')})
+                  {currentUser?.isAnonymous ? (
+                    <div className="border-t border-gray-200 pt-4 mt-2">
+                      <div className="bg-gray-100 p-4 rounded-lg text-center text-sm text-gray-500 font-bold border border-gray-200">
+                        🔒 視聴記録やメモを保存するには、<br />Googleアカウントでのログインが必要です。
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="border-t border-gray-200 pt-4 pb-2 mt-2">
+                      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-3 gap-3">
+                        <div className="flex items-center gap-2">
+                          <h4 className="text-xs sm:text-sm font-bold text-gray-800">視聴メモ</h4>
+                          {record?.updatedAt && (
+                            <span className="text-[10px] text-gray-400 font-medium">
+                              (最終更新: {new Date(record.updatedAt).toLocaleDateString('ja-JP')})
+                            </span>
+                          )}
+                        </div>
+                        
+                        <div className="flex items-center border border-gray-300 rounded bg-gray-50 overflow-hidden shadow-sm">
+                          <button onClick={handleOpenDecreaseConfirm} className="px-3 py-1 text-gray-600 hover:bg-gray-200">−</button>
+                          <span className="px-3 py-1 text-xs text-gray-700 border-x border-gray-300 min-w-[6rem] text-center font-medium bg-white">
+                            視聴回数：{record?.viewCount || 0}
                           </span>
-                        )}
+                          <button onClick={handleOpenIncreaseConfirm} className="px-3 py-1 text-gray-600 hover:bg-gray-200">+</button>
+                        </div>
                       </div>
                       
-                      <div className="flex items-center border border-gray-300 rounded bg-gray-50 overflow-hidden shadow-sm">
-                        <button onClick={handleOpenDecreaseConfirm} className="px-3 py-1 text-gray-600 hover:bg-gray-200">−</button>
-                        <span className="px-3 py-1 text-xs text-gray-700 border-x border-gray-300 min-w-[6rem] text-center font-medium bg-white">
-                          視聴回数：{record?.viewCount || 0}
-                        </span>
-                        <button onClick={handleOpenIncreaseConfirm} className="px-3 py-1 text-gray-600 hover:bg-gray-200">+</button>
+                      <textarea 
+                        value={localMemo}
+                        onChange={(e) => setLocalMemo(e.target.value)}
+                        className="w-full border border-gray-300 rounded-lg p-3 text-xs sm:text-sm focus:border-blue-400 focus:ring-1 focus:ring-blue-400 min-h-[100px] mb-2 shadow-sm bg-gray-50"
+                        placeholder="感想や推しポイントを入力..."
+                      ></textarea>
+
+                      <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3 mb-3">
+                        <select
+                          value={visibility}
+                          onChange={(e) => setVisibility(e.target.value as 'private' | 'public_anonymous' | 'public_named')}
+                          className="text-xs sm:text-sm py-2 pl-3 pr-8 border border-gray-300 rounded-lg shadow-sm focus:border-blue-400 focus:ring-1 focus:ring-blue-400 bg-white text-gray-700"
+                        >
+                          <option value="private">非公開（自分のみ）</option>
+                          <option value="public_anonymous">公開（匿名）</option>
+                          <option value="public_named">公開（名前を表示）</option>
+                        </select>
+
+                        <button 
+                          onClick={handleSaveMemo}
+                          disabled={saveStatus !== "idle"}
+                          className={`w-full sm:w-auto px-5 py-2 font-bold rounded-lg text-xs sm:text-sm shadow-sm transition-colors ${
+                            saveStatus === "success" ? "bg-green-500 text-white" :
+                            saveStatus === "saving" ? "bg-blue-400 text-white cursor-not-allowed" :
+                            "bg-blue-600 hover:bg-blue-700 text-white"
+                          }`}
+                        >
+                          {saveStatus === "success" ? "保存しました" : saveStatus === "saving" ? "保存中..." : "保存する"}
+                        </button>
                       </div>
                     </div>
-                    
-                    <textarea 
-                      value={localMemo}
-                      onChange={(e) => setLocalMemo(e.target.value)}
-                      className="w-full border border-gray-300 rounded-lg p-3 text-xs sm:text-sm focus:border-blue-400 focus:ring-1 focus:ring-blue-400 min-h-[100px] mb-2 shadow-sm bg-gray-50"
-                      placeholder="感想や推しポイントを入力..."
-                    ></textarea>
-
-                    <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3 mb-3">
-                      <select
-                        value={visibility}
-                        onChange={(e) => setVisibility(e.target.value as 'private' | 'public_anonymous' | 'public_named')}
-                        className="text-xs sm:text-sm py-2 pl-3 pr-8 border border-gray-300 rounded-lg shadow-sm focus:border-blue-400 focus:ring-1 focus:ring-blue-400 bg-white text-gray-700"
-                      >
-                        <option value="private">非公開（自分のみ）</option>
-                        <option value="public_anonymous">公開（匿名）</option>
-                        <option value="public_named">公開（名前を表示）</option>
-                      </select>
-
-                      <button 
-                        onClick={handleSaveMemo}
-                        disabled={saveStatus !== "idle"}
-                        className={`w-full sm:w-auto px-5 py-2 font-bold rounded-lg text-xs sm:text-sm shadow-sm transition-colors ${
-                          saveStatus === "success" ? "bg-green-500 text-white" :
-                          saveStatus === "saving" ? "bg-blue-400 text-white cursor-not-allowed" :
-                          "bg-blue-600 hover:bg-blue-700 text-white"
-                        }`}
-                      >
-                        {saveStatus === "success" ? "保存しました" : saveStatus === "saving" ? "保存中..." : "保存する"}
-                      </button>
-                    </div>
-                  </div>
+                  )}
 
                   <div className="mt-8 border-t border-gray-200 pt-6">
                     <h4 className="text-sm font-bold text-gray-800 mb-4">みんなのメモ</h4>
@@ -244,7 +311,6 @@ export const StreamDetailModal = ({ stream, record, onClose, onUpdateRecord, isR
                       <p className="text-xs text-gray-500">読み込み中...</p>
                     ) : publicMemos.length > 0 ? (
                       <div className="flex flex-col gap-3">
-                        {/* 🌟 修正ポイント2: indexを使って重複エラーを完全解消 */}
                         {publicMemos.map((m, index) => (
                           <div key={`${m.id}-${index}`} className="bg-gray-50 p-3 rounded-lg border border-gray-100">
                             <div className="flex items-center gap-2 mb-1.5">

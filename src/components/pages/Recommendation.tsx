@@ -1,6 +1,5 @@
 // src/components/pages/Recommendation.tsx
 import { useState, useEffect } from 'react';
-// 🌟 管理用ドキュメントを読み書きするための必要最小限のインポートのみ残しています
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../../firebase'; 
 
@@ -11,71 +10,110 @@ import { useUserRecords } from '../../hooks/useUserRecords';
 import { DailyThread } from '../thread/DailyThread';
 import type { StreamData } from '../../types';
 import { useStreams } from '../../contexts/StreamContext';
+import { useUserData } from '../../hooks/useUserData';
+import { useAuth } from '../../contexts/AuthContext';
 
 export default function Recommendation() {
   const { records, updateRecord } = useUserRecords();
   const { streams, isLoading: isStreamsLoading } = useStreams(); 
+  const { userData, loading: isUserLoading } = useUserData();
+  const { currentUser, loading: isAuthLoading } = useAuth();
+  
   const [recommendedStream, setRecommendedStream] = useState<StreamData | null>(null);
   const [selectedStream, setSelectedStream] = useState<StreamData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // 今日の日付文字列を取得（例: "2026-08-16"）
   const getTodayStr = () => {
     const today = new Date();
     return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
   };
 
   useEffect(() => {
-    if (isStreamsLoading) return;
+    // 認証状態の確認と動画データのロードを待つ（ゲストの場合は isUserLoading を待たない）
+    if (isStreamsLoading || isAuthLoading) return;
+    if (currentUser && !currentUser.isAnonymous && isUserLoading) return;
 
     const fetchTodayRecommendation = async () => {
       try {
-        const validStreams = streams.filter(s => s.youtubeUrl && s.youtubeUrl.trim() !== "");
-        if (validStreams.length === 0) {
+        const validStreamsAll = streams.filter(s => s.youtubeUrl && s.youtubeUrl.trim() !== "");
+        const validStreamsOfficial = validStreamsAll.filter(s => s.is_official !== false && (s.is_official as any) !== "false");
+
+        if (validStreamsAll.length === 0) {
           setRecommendedStream(null);
           return;
         }
 
         const todayStr = getTodayStr();
-        
-        // Firestoreの「system/recommendation」というたった1つのファイルを読みに行く
+        const isEx = Boolean(userData?.exMode === true);
+
         const recRef = doc(db, 'system', 'recommendation');
         const recSnap = await getDoc(recRef);
-        const recData = recSnap.exists() ? recSnap.data() : { date: '', streamId: '', shownIds: [] };
+        
+        const recData = recSnap.exists() ? recSnap.data() : { 
+          date: '', 
+          streamId_all: '', 
+          streamId_official: '', 
+          shownIds_all: [], 
+          shownIds_official: [] 
+        };
 
-        // パターンA: 既に「今日の動画」がFirestoreに記録されている場合は、それを表示するだけ
-        if (recData.date === todayStr && recData.streamId) {
-          const stream = validStreams.find(s => s.id === recData.streamId);
+        // パターンA: 既に「今日の動画」がFirestoreに記録されている場合
+        if (recData.date === todayStr && (recData.streamId_all || recData.streamId_official || recData.streamId)) {
+          const targetId = isEx 
+            ? (recData.streamId_all || recData.streamId) 
+            : (recData.streamId_official || recData.streamId_all || recData.streamId);
+          
+          const stream = validStreamsAll.find(s => s.id === targetId);
           if (stream) {
             setRecommendedStream(stream);
             return;
           }
         }
 
-        // パターンB: 日付が変わって「最初の1人目」だった場合、新しい動画を選んで記録する
-        let shownIds: string[] = recData.shownIds || [];
+        // パターンB: 新しい動画を選出する
+        let shownIds_all: string[] = recData.shownIds_all || recData.shownIds || [];
+        let shownIds_official: string[] = recData.shownIds_official || recData.shownIds || [];
         
-        // まだ選ばれていない動画を絞り込む
-        let unshownStreams = validStreams.filter(s => !shownIds.includes(s.id));
+        let unshown_all = validStreamsAll.filter(s => !shownIds_all.includes(s.id));
+        if (unshown_all.length === 0) {
+          shownIds_all = [];
+          unshown_all = validStreamsAll;
+        }
+        const candidate_all = unshown_all[Math.floor(Math.random() * unshown_all.length)];
 
-        // もし全部選ばれ尽くしていたらリストをリセットしてループする
-        if (unshownStreams.length === 0) {
-          shownIds = [];
-          unshownStreams = validStreams;
+        let candidate_official = null;
+        const isCandidateAllOfficial = candidate_all.is_official !== false && (candidate_all.is_official as any) !== "false";
+
+        if (isCandidateAllOfficial) {
+          candidate_official = candidate_all;
+        } else {
+          let unshown_official = validStreamsOfficial.filter(s => !shownIds_official.includes(s.id));
+          if (unshown_official.length === 0) {
+            shownIds_official = [];
+            unshown_official = validStreamsOfficial;
+          }
+          candidate_official = unshown_official[Math.floor(Math.random() * unshown_official.length)] || candidate_all;
         }
 
-        // まだ選ばれていないものの中からランダムに1つ選ぶ
-        const randomIndex = Math.floor(Math.random() * unshownStreams.length);
-        const candidate = unshownStreams[randomIndex];
+        // 画面へのセット
+        const targetStream = isEx ? candidate_all : candidate_official;
+        setRecommendedStream(targetStream);
 
-        // 選んだ動画と、過去の履歴をFirestoreに「上書き保存」する
-        await setDoc(recRef, {
-          date: todayStr,
-          streamId: candidate.id,
-          shownIds: [...shownIds, candidate.id]
-        });
+        // Firestoreへの書き込み（ゲスト等でパーミッションエラーになっても画面表示は維持する）
+        try {
+          const new_shownIds_all = Array.from(new Set([...shownIds_all, candidate_all.id]));
+          const new_shownIds_official = Array.from(new Set([...shownIds_official, candidate_official.id]));
 
-        setRecommendedStream(candidate);
+          await setDoc(recRef, {
+            date: todayStr,
+            streamId_all: candidate_all.id,
+            streamId_official: candidate_official.id,
+            shownIds_all: new_shownIds_all,
+            shownIds_official: new_shownIds_official
+          });
+        } catch (writeErr) {
+          console.warn("Firestoreへのおすすめ更新権限がありません（閲覧のみ継続）:", writeErr);
+        }
 
       } catch (error) {
         console.error("おすすめ動画の計算・取得に失敗しました:", error);
@@ -85,7 +123,7 @@ export default function Recommendation() {
     };
 
     fetchTodayRecommendation();
-  }, [streams, isStreamsLoading]);
+  }, [streams, isStreamsLoading, userData, isUserLoading, currentUser, isAuthLoading]);
 
   return (
     <div className="p-4 relative pb-20">

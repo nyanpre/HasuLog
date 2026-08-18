@@ -1,11 +1,10 @@
 // src/App.tsx
-import { signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
+import { signInWithPopup, GoogleAuthProvider, signInAnonymously } from 'firebase/auth'; // 🌟 signInAnonymouslyを追加
 import { auth } from './firebase';
 import { useAuth } from './contexts/AuthContext';
 import { Routes, Route, Navigate } from 'react-router-dom';
 
 import { StreamProvider } from './contexts/StreamContext';
-// 🌟 新しく作成した Provider をインポート
 import { UserRecordsProvider } from './contexts/UserRecordsContext';
 
 import Layout from './components/common/Layout';
@@ -27,6 +26,16 @@ export default function App() {
     }
   };
 
+  // 🌟 追加: ゲストログイン処理
+  const handleGuestLogin = async () => {
+    try {
+      await signInAnonymously(auth);
+    } catch (error) {
+      console.error("ゲストログインエラー:", error);
+      alert("エラーが発生しました。");
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -37,7 +46,6 @@ export default function App() {
 
   if (currentUser) {
     return (
-      // 🌟 UserRecordsProvider と StreamProvider でアプリ全体を囲む
       <UserRecordsProvider>
         <StreamProvider>
           <Layout>
@@ -63,11 +71,20 @@ export default function App() {
         <p className="text-gray-600 mb-8 text-sm">
           活動記録やWith×MEETSのデータを<br />管理・共有しよう
         </p>
+        
         <button 
           onClick={handleLogin}
-          className="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded transition duration-200"
+          className="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded transition duration-200 mb-3"
         >
           Googleでログイン
+        </button>
+        
+        {/* 🌟 追加: ゲストログインボタン */}
+        <button 
+          onClick={handleGuestLogin}
+          className="w-full bg-gray-100 hover:bg-gray-200 text-gray-600 font-bold py-2 px-4 rounded transition duration-200 text-sm"
+        >
+          ゲストとして利用する（機能制限あり）
         </button>
       </div>
     </div>
