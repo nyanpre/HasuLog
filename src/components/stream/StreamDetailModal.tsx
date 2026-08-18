@@ -111,14 +111,12 @@ export const StreamDetailModal = ({ stream, record, onClose, onUpdateRecord, isR
     } 
   };
 
-  // 🌟 公式・非公式とexModeの判定を安全に強化
+  // 公式・非公式とexModeの判定
   const isOfficialStream = stream ? (stream.is_official !== false && (stream.is_official as any) !== "false") : false;
 
   const canShowYoutubeLink = () => {
     if (!stream) return false;
-    // 公式動画なら誰でも閲覧可能
     if (isOfficialStream) return true;
-    // 非公式動画の場合は exMode ユーザーのみ閲覧可能
     return userData?.exMode === true;
   };
 
@@ -132,12 +130,12 @@ export const StreamDetailModal = ({ stream, record, onClose, onUpdateRecord, isR
     }
 
     if (Array.isArray(stream.extraYoutubeUrls)) {
-      return stream.extraYoutubeUrls.map((item: any, idx: number) => {
+      return stream.extraYoutubeUrls.map((item: any) => {
         if (typeof item === 'string') {
-          return { label: `第二部`, url: item };
+          return { label: '第二部', url: item };
         }
         return {
-          label: item.label || `第二部`,
+          label: item.label || '第二部',
           url: item.url || ''
         };
       }).filter(item => item.url);
@@ -212,10 +210,8 @@ export const StreamDetailModal = ({ stream, record, onClose, onUpdateRecord, isR
                     </p>
                   </div>
 
-                  {/* 🌟 メインボタン ＆ サブボタン */}
                   {stream.youtubeUrl && stream.youtubeUrl !== "" && canShowYoutubeLink() && (
                     <div className="flex flex-col gap-2 mb-6">
-                      {/* メインボタン（URLが2つある場合は【第一部】表記） */}
                       <button 
                         onClick={() => handleOpenYoutubeConfirm(stream.youtubeUrl)}
                         className="flex items-center justify-center w-full bg-red-600 hover:bg-red-700 text-white font-bold py-2.5 px-4 rounded-lg shadow-sm text-sm transition-colors active:scale-[0.98]"
@@ -226,7 +222,6 @@ export const StreamDetailModal = ({ stream, record, onClose, onUpdateRecord, isR
                         </span>
                       </button>
 
-                      {/* サブボタン（【第二部】表記） */}
                       {hasMultipleUrls && (
                         extraUrls.map((extra, idx) => (
                           <button 
