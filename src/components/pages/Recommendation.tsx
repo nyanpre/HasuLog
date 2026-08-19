@@ -1,6 +1,6 @@
 // src/components/pages/Recommendation.tsx
 import { useState, useEffect } from 'react';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc } from 'firebase/firestore'; 
 import { db } from '../../firebase'; 
 
 import { Loader2, Star } from 'lucide-react';
@@ -13,7 +13,7 @@ import { useStreams } from '../../contexts/StreamContext';
 import { useUserData } from '../../hooks/useUserData';
 import { useAuth } from '../../contexts/AuthContext';
 
-// 🌟 おすすめの対象とする配信種別をホワイトリスト形式で定義
+// 🌟 おすすめ抽選の対象とする配信種別
 const RECOMMENDED_TYPES = ['with_meets', 'with_station'];
 
 export default function Recommendation() {
@@ -37,21 +37,6 @@ export default function Recommendation() {
 
     const fetchTodayRecommendation = async () => {
       try {
-        // 🌟 RECOMMENDED_TYPES (with_meets, with_station) に該当する動画のみを抽出
-        const validStreamsAll = streams.filter(
-          s => s.youtubeUrl && 
-               s.youtubeUrl.trim() !== "" && 
-               RECOMMENDED_TYPES.includes(s.type)
-        );
-        const validStreamsOfficial = validStreamsAll.filter(
-          s => s.is_official !== false && (s.is_official as any) !== "false"
-        );
-
-        if (validStreamsAll.length === 0) {
-          setRecommendedStream(null);
-          return;
-        }
-
         const todayStr = getTodayStr();
         const isEx = Boolean(userData?.exMode === true);
 
@@ -66,21 +51,37 @@ export default function Recommendation() {
           shownIds_official: [] 
         };
 
-        // パターンA: 既に「今日の動画」がFirestoreに記録されている場合
+        // 🌟 パターンA: 既に「今日の動画」がFirestoreにある場合
         if (recData.date === todayStr && (recData.streamId_all || recData.streamId_official || recData.streamId)) {
           const targetId = isEx 
             ? (recData.streamId_all || recData.streamId) 
             : (recData.streamId_official || recData.streamId_all || recData.streamId);
           
-          // 該当IDの動画を取得（対象種別内のものか確認）
-          const stream = validStreamsAll.find(s => s.id === targetId);
-          if (stream) {
+          const stream = streams.find(s => s.id === targetId);
+          
+          // 💡 取得した今日の動画が RECOMMENDED_TYPES に含まれているかチェック
+          // 含まれていなければパターンAをスキップし、すぐ下で再抽選させる
+          if (stream && RECOMMENDED_TYPES.includes(stream.type)) {
             setRecommendedStream(stream);
             return;
           }
         }
 
-        // パターンB: 新しい動画を選出する
+        // 🌟 パターンB: 新しく抽選する場合（With×MEETS / With×STATION のみ）
+        const validStreamsAll = streams.filter(
+          s => s.youtubeUrl && 
+               s.youtubeUrl.trim() !== "" && 
+               RECOMMENDED_TYPES.includes(s.type)
+        );
+        const validStreamsOfficial = validStreamsAll.filter(
+          s => s.is_official !== false && (s.is_official as any) !== "false"
+        );
+
+        if (validStreamsAll.length === 0) {
+          setRecommendedStream(null);
+          return;
+        }
+
         let shownIds_all: string[] = recData.shownIds_all || recData.shownIds || [];
         let shownIds_official: string[] = recData.shownIds_official || recData.shownIds || [];
         
@@ -108,7 +109,7 @@ export default function Recommendation() {
         const targetStream = isEx ? candidate_all : candidate_official;
         setRecommendedStream(targetStream);
 
-        // Firestoreへの保存
+        // Firestoreへの保存（上書き）
         try {
           const new_shownIds_all = Array.from(new Set([...shownIds_all, candidate_all.id]));
           const new_shownIds_official = Array.from(new Set([...shownIds_official, candidate_official.id]));
@@ -119,7 +120,7 @@ export default function Recommendation() {
             streamId_official: candidate_official.id,
             shownIds_all: new_shownIds_all,
             shownIds_official: new_shownIds_official
-          });
+          }, { merge: true });
         } catch (writeErr) {
           console.warn("Firestoreへのおすすめ更新権限がありません（閲覧のみ継続）:", writeErr);
         }
