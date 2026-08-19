@@ -13,13 +13,8 @@ import { useStreams } from '../../contexts/StreamContext';
 import { useUserData } from '../../hooks/useUserData';
 import { useAuth } from '../../contexts/AuthContext';
 
-// 🌟 明日以降、新しく抽選する対象の配信種別
+// 🌟 おすすめの対象とする配信種別をホワイトリスト形式で定義
 const RECOMMENDED_TYPES = ['with_meets', 'with_station'];
-
-// 🌟 今日の動画を固定したい場合の指定（ここに動画のIDを貼り付けます）
-// 例: const TODAY_OVERRIDE_ID = "47150b43-a090-4bab-aaca-92c1488906bb";
-// 固定を解除したいときは "" (空文字) に戻せばOKです。
-const TODAY_OVERRIDE_ID = "708d74d6-d500-43a3-adb1-5bc6bb4493f7";
 
 export default function Recommendation() {
   const { records, updateRecord } = useUserRecords();
@@ -42,58 +37,7 @@ export default function Recommendation() {
 
     const fetchTodayRecommendation = async () => {
       try {
-        const todayStr = getTodayStr();
-        const isEx = Boolean(userData?.exMode === true);
-
-        // 🌟 1. 固定指定（TODAY_OVERRIDE_ID）がある場合の最優先処理
-        if (TODAY_OVERRIDE_ID) {
-          const overrideStream = streams.find(s => s.id === TODAY_OVERRIDE_ID);
-          if (overrideStream) {
-            setRecommendedStream(overrideStream);
-            setIsLoading(false);
-
-            // Firestore側もこの固定IDで上書き・同期しておく
-            try {
-              const recRef = doc(db, 'system', 'recommendation');
-              await setDoc(recRef, {
-                date: todayStr,
-                streamId_all: TODAY_OVERRIDE_ID,
-                streamId_official: TODAY_OVERRIDE_ID,
-                shownIds_all: [TODAY_OVERRIDE_ID],
-                shownIds_official: [TODAY_OVERRIDE_ID]
-              }, { merge: true });
-            } catch (e) {
-              console.warn("Firestore固定ID同期スキップ:", e);
-            }
-            return;
-          }
-        }
-
-        const recRef = doc(db, 'system', 'recommendation');
-        const recSnap = await getDoc(recRef);
-        
-        const recData = recSnap.exists() ? recSnap.data() : { 
-          date: '', 
-          streamId_all: '', 
-          streamId_official: '', 
-          shownIds_all: [], 
-          shownIds_official: [] 
-        };
-
-        // 🌟 パターンA: 既に「今日の動画」がFirestoreにある場合
-        if (recData.date === todayStr && (recData.streamId_all || recData.streamId_official || recData.streamId)) {
-          const targetId = isEx 
-            ? (recData.streamId_all || recData.streamId) 
-            : (recData.streamId_official || recData.streamId_all || recData.streamId);
-          
-          const stream = streams.find(s => s.id === targetId);
-          if (stream) {
-            setRecommendedStream(stream);
-            return;
-          }
-        }
-
-        // 🌟 パターンB: 明日以降、新しく抽選する場合（With×MEETS / With×STATION のみ）
+        // 🌟 RECOMMENDED_TYPES (with_meets, with_station) に該当する動画のみを抽出
         const validStreamsAll = streams.filter(
           s => s.youtubeUrl && 
                s.youtubeUrl.trim() !== "" && 
@@ -108,6 +52,35 @@ export default function Recommendation() {
           return;
         }
 
+        const todayStr = getTodayStr();
+        const isEx = Boolean(userData?.exMode === true);
+
+        const recRef = doc(db, 'system', 'recommendation');
+        const recSnap = await getDoc(recRef);
+        
+        const recData = recSnap.exists() ? recSnap.data() : { 
+          date: '', 
+          streamId_all: '', 
+          streamId_official: '', 
+          shownIds_all: [], 
+          shownIds_official: [] 
+        };
+
+        // パターンA: 既に「今日の動画」がFirestoreに記録されている場合
+        if (recData.date === todayStr && (recData.streamId_all || recData.streamId_official || recData.streamId)) {
+          const targetId = isEx 
+            ? (recData.streamId_all || recData.streamId) 
+            : (recData.streamId_official || recData.streamId_all || recData.streamId);
+          
+          // 該当IDの動画を取得（対象種別内のものか確認）
+          const stream = validStreamsAll.find(s => s.id === targetId);
+          if (stream) {
+            setRecommendedStream(stream);
+            return;
+          }
+        }
+
+        // パターンB: 新しい動画を選出する
         let shownIds_all: string[] = recData.shownIds_all || recData.shownIds || [];
         let shownIds_official: string[] = recData.shownIds_official || recData.shownIds || [];
         
