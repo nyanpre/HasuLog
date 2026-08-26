@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import * as Dialog from '@radix-ui/react-dialog';
 import { useAuth } from "../../contexts/AuthContext";
-import { addWatchRecord, removeWatchRecord } from "../../utils/pointSystem";
+import { addWatchRecord, removeWatchRecord, updateMemoBonus, getStreamPoints } from "../../utils/pointSystem";
 import { WatchConfirmModal } from "../common/WatchConfirmModal";
 import { usePublicMemos } from "../../hooks/usePublicMemos";
 import { useUserData } from "../../hooks/useUserData";
@@ -35,15 +35,45 @@ export const StreamDetailModal = ({ stream, record, onClose, onUpdateRecord, isR
     setSaveStatus("idle");
   }, [record, stream]);
 
+  // 🌟 保存時のロジックをここに集約
   const handleSaveMemo = async () => {
-    if (typeof onUpdateRecord !== 'function' || !stream) return;
+    if (typeof onUpdateRecord !== 'function' || !stream || !currentUser) return;
     
+    let finalVisibility = visibility;
+    const isCurrentlyAwarded = record?.memoPointsAwarded || false;
+
+    // 1. 公開提案ポップアップ
+    if (visibility === 'private' && localMemo.trim() !== '' && !isCurrentlyAwarded) {
+      const wantPublic = window.confirm(
+        "メモを公開しませんか？【50pt】\n\n公開設定（匿名または記名）にして保存すると、50ptを獲得できます！\n\n[OK] 「公開（匿名）」に変更して保存する\n[キャンセル] 「非公開」のまま保存する"
+      );
+      if (wantPublic) {
+        finalVisibility = 'public_anonymous';
+        setVisibility('public_anonymous');
+      }
+    }
+
     setSaveStatus("saving");
     try {
+      const isPublic = finalVisibility === 'public_anonymous' || finalVisibility === 'public_named';
+      const hasText = localMemo.trim() !== '';
+      let willBeAwarded = isCurrentlyAwarded;
+
+      // 2. ポイントの付与・回収処理
+      if (isPublic && hasText && !isCurrentlyAwarded) {
+        await updateMemoBonus(currentUser.uid, stream.title, true);
+        willBeAwarded = true;
+      } else if ((!isPublic || !hasText) && isCurrentlyAwarded) {
+        await updateMemoBonus(currentUser.uid, stream.title, false);
+        willBeAwarded = false;
+      }
+
+      // 3. レコードの保存
       await onUpdateRecord(stream.id, { 
         streamId: stream.id,
         memo: localMemo,
-        memoVisibility: visibility,
+        memoVisibility: finalVisibility,
+        memoPointsAwarded: willBeAwarded, // 更新されたフラグを保存
         userName: currentUser?.displayName || '名無しユーザー',
         lastAction: 'memo',
         updatedAt: new Date().toISOString()
@@ -51,7 +81,6 @@ export const StreamDetailModal = ({ stream, record, onClose, onUpdateRecord, isR
       setSaveStatus("success");
       
       refetchMemos(); 
-      
       setTimeout(() => setSaveStatus("idle"), 2000);
     } catch (error) {
       console.error("保存エラー:", error);
@@ -93,9 +122,9 @@ export const StreamDetailModal = ({ stream, record, onClose, onUpdateRecord, isR
 
     if (currentUser && !currentUser.isAnonymous && stream) {
       if (actionMode === 'decrease') {
-        removeWatchRecord(currentUser.uid, stream.id, stream.title).catch(console.error);
+        removeWatchRecord(currentUser.uid, stream.id, stream.title, stream.type).catch(console.error);
       } else {
-        addWatchRecord(currentUser.uid, stream.id, stream.title, isRecommended).catch(console.error);
+        addWatchRecord(currentUser.uid, stream.id, stream.title, isRecommended, stream.type).catch(console.error);
       }
     }
 
@@ -111,12 +140,10 @@ export const StreamDetailModal = ({ stream, record, onClose, onUpdateRecord, isR
     } 
   };
 
-  // 🌟 公式・非公式とexModeの判定
   const isOfficialStream = stream ? (stream.is_official !== false && (stream.is_official as any) !== "false") : false;
   const isExUser = Boolean(currentUser && userData?.exMode === true);
   const isRestrictedType = stream ? (stream.type === "fes_live" || stream.type === "story") : false;
 
-  // 🌟 サムネイル表示の判定 (非公式かつ制限されたタイプならexModeのみ表示)
   const shouldShowThumbnail = Boolean(stream?.thumbnailUrl) &&
     (!(isRestrictedType && !isOfficialStream) || isExUser);
 
@@ -126,7 +153,6 @@ export const StreamDetailModal = ({ stream, record, onClose, onUpdateRecord, isR
     return userData?.exMode === true;
   };
 
-  // extraYoutubeUrls の正規化
   const getNormalizedExtraUrls = (): { label: string; url: string }[] => {
     if (!stream || !stream.extraYoutubeUrls) return [];
     
@@ -345,6 +371,7 @@ export const StreamDetailModal = ({ stream, record, onClose, onUpdateRecord, isR
         isOpen={isConfirmOpen}
         videoTitle={stream?.title || ""}
         actionType={actionMode}
+        earnedPoints={stream ? getStreamPoints(stream.type, isRecommended) : 100}
         onClose={() => setIsConfirmOpen(false)}
         onConfirm={handleConfirmWatch}
         onSkip={handleSkipWatch}

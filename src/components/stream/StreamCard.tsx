@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { useAuth } from "../../contexts/AuthContext";
 import { useUserData } from "../../hooks/useUserData";
-import { addWatchRecord, removeWatchRecord } from "../../utils/pointSystem";
+import { addWatchRecord, removeWatchRecord, getStreamPoints } from "../../utils/pointSystem";
 import { WatchConfirmModal } from "../common/WatchConfirmModal";
 import type { StreamData } from "../../types";
 
@@ -41,9 +41,11 @@ export const StreamCard = ({ stream, columns, viewCount, onClick }: Props) => {
     if (currentUser) {
       try {
         if (actionMode === 'increase') {
-          await addWatchRecord(currentUser.uid, stream.id, stream.title);
+          // 🌟 第4引数(おすすめ判定)はfalse、第5引数に動画種別(stream.type)を渡す
+          await addWatchRecord(currentUser.uid, stream.id, stream.title, false, stream.type);
         } else {
-          await removeWatchRecord(currentUser.uid, stream.id, stream.title);
+          // 🌟 第4引数に動画種別(stream.type)を渡す
+          await removeWatchRecord(currentUser.uid, stream.id, stream.title, stream.type);
         }
       } catch (error) {
         console.error("記録に失敗しました", error);
@@ -140,6 +142,7 @@ export const StreamCard = ({ stream, columns, viewCount, onClick }: Props) => {
             isOpen={isConfirmOpen}
             videoTitle={stream.title}
             actionType={actionMode}
+            earnedPoints={getStreamPoints(stream.type, false)}
             onClose={() => setIsConfirmOpen(false)}
             onConfirm={handleConfirm}
             onSkip={() => setIsConfirmOpen(false)}

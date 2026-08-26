@@ -2,8 +2,6 @@
 import { doc, getDoc, setDoc, updateDoc, increment, serverTimestamp, collection, addDoc } from "firebase/firestore";
 import { db } from "../firebase";
 
-const POINT_PER_WATCH = 100;
-
 export const getRankInfo = (points: number) => {
   if (points >= 3000) return { rank: "S", label: "Gold", color: "text-yellow-500", bg: "bg-yellow-100", nextAt: null };
   if (points >= 2000) return { rank: "A", label: "Silver", color: "text-slate-400", bg: "bg-slate-100", nextAt: 5000 };
@@ -14,20 +12,29 @@ export const getRankInfo = (points: number) => {
   return { rank: "Unranked", label: "White", color: "text-gray-400", bg: "bg-white", border: "border border-gray-200", nextAt: 100 };
 };
 
+// 🌟 追加: 種別とおすすめ状態から獲得ポイントを計算する関数
+export const getStreamPoints = (streamType: string, isRecommended: boolean = false) => {
+  if (streamType === "story") return 500;
+  if (streamType === "fes_live") return 300;
+  // with_meets, with_station は通常100pt、おすすめ200pt
+  return isRecommended ? 200 : 100;
+};
+
 export const addWatchRecord = async (
   userId: string, 
   streamId: string, 
   streamTitle: string,
-  isRecommended: boolean = false
+  isRecommended: boolean = false,
+  streamType: string = "with_meets" // 🌟 追加: 動画種別を受け取る
 ) => {
   if (!userId || !streamId) return;
 
-  const earnedPoints = isRecommended ? 200 : POINT_PER_WATCH;
+  // 🌟 種別に応じたポイントを計算
+  const earnedPoints = getStreamPoints(streamType, isRecommended);
   const actionMessage = isRecommended 
     ? `【今日のおすすめ】「${streamTitle}」を視聴して ${earnedPoints}pt 獲得しました！` 
     : `「${streamTitle}」を視聴して ${earnedPoints}pt 獲得しました！`;
 
-  // 🌟 アクションタイプを判定
   const actionType = isRecommended ? 'recommended_watch' : 'watch';
 
   const userRef = doc(db, "users", userId);
@@ -66,7 +73,7 @@ export const addWatchRecord = async (
     await updateDoc(recordRef, {
       viewCount: increment(1),
       lastViewedAt: now.toISOString(),
-      lastAction: actionType, // 🌟 更新
+      lastAction: actionType,
       updatedAt: serverTimestamp()
     });
   } else {
@@ -76,8 +83,10 @@ export const addWatchRecord = async (
       viewCount: 1,
       isFavorite: false,
       memo: "",
+      memoVisibility: "private", // デフォルト非公開
+      memoPointsAwarded: false, // 🌟 ポイント付与済みフラグ
       lastViewedAt: now.toISOString(),
-      lastAction: actionType, // 🌟 更新
+      lastAction: actionType,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp()
     });
@@ -95,9 +104,13 @@ export const addWatchRecord = async (
 export const removeWatchRecord = async (
   userId: string, 
   streamId: string, 
-  streamTitle: string
+  streamTitle: string,
+  streamType: string = "with_meets" // 🌟 追加
 ) => {
   if (!userId || !streamId) return;
+
+  // 🌟 取り消し時はベースポイント（おすすめボーナスなし）を引く仕様
+  const deductPoints = getStreamPoints(streamType, false);
 
   const userRef = doc(db, "users", userId);
   const recordRef = doc(db, `users/${userId}/watchHistory`, streamId);
@@ -105,8 +118,8 @@ export const removeWatchRecord = async (
   const userSnap = await getDoc(userRef);
   if (userSnap.exists()) {
     await updateDoc(userRef, {
-      monthlyPoints: increment(-POINT_PER_WATCH),
-      totalPoints: increment(-POINT_PER_WATCH),
+      monthlyPoints: increment(-deductPoints),
+      totalPoints: increment(-deductPoints),
       updatedAt: serverTimestamp()
     });
   }
@@ -130,4 +143,35 @@ export const removeWatchRecord = async (
     type: "remove_watch",
     createdAt: serverTimestamp()
   });
+};
+
+// 🌟 追加: メモ公開時の50ptボーナス付与・解除
+export const updateMemoBonus = async (
+  userId: string,
+  streamTitle: string,
+  isAdding: boolean
+) => {
+  if (!userId) return;
+
+  const points = isAdding ? 50 : -50;
+  const userRef = doc(db, "users", userId);
+  
+  const userSnap = await getDoc(userRef);
+  if (userSnap.exists()) {
+    await updateDoc(userRef, {
+      monthlyPoints: increment(points),
+      totalPoints: increment(points),
+      updatedAt: serverTimestamp()
+    });
+  }
+
+  if (isAdding) {
+    const timelineRef = collection(db, "timeline");
+    await addDoc(timelineRef, {
+      userId,
+      message: `「${streamTitle}」のメモを公開して 50pt 獲得しました！`,
+      type: "memo_public",
+      createdAt: serverTimestamp()
+    });
+  }
 };

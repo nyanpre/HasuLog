@@ -7,6 +7,7 @@ export interface StreamRecord {
   viewCount: number;
   memo: string;
   memoVisibility?: 'private' | 'public_anonymous' | 'public_named'; 
+  memoPointsAwarded?: boolean; // 🌟 50pt付与済みかどうかのフラグのみ追加
   isFavorite?: boolean;
   lastViewedAt: string;
   updatedAt: string;

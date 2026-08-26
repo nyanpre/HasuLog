@@ -1,28 +1,26 @@
 // src/components/common/WatchConfirmModal.tsx
 import { PlayCircle, ExternalLink, PlusCircle, MinusCircle, X } from 'lucide-react';
-import * as Dialog from '@radix-ui/react-dialog'; // 🌟 追加: Radix UIをインポート
+import * as Dialog from '@radix-ui/react-dialog';
 
 interface WatchConfirmModalProps {
   isOpen: boolean;
   videoTitle: string;
   actionType: 'youtube' | 'increase' | 'decrease';
+  earnedPoints: number; // 🌟 追加: 獲得予定のポイントを受け取る
   onClose: () => void;
   onConfirm: () => void;
   onSkip: () => void;
 }
 
-export const WatchConfirmModal = ({ isOpen, videoTitle, actionType, onClose, onConfirm, onSkip }: WatchConfirmModalProps) => {
+export const WatchConfirmModal = ({ isOpen, videoTitle, actionType, earnedPoints, onClose, onConfirm, onSkip }: WatchConfirmModalProps) => {
   const isDecrease = actionType === 'decrease';
   const isYoutube = actionType === 'youtube';
 
   return (
-    // 🌟 修正: 手作りの <div> から Radix UI の <Dialog.Root> に変更
     <Dialog.Root open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <Dialog.Portal>
-        {/* 背景の暗い部分 (z-indexを少し高めに設定) */}
         <Dialog.Overlay className="fixed inset-0 z-[60] bg-black/50 backdrop-blur-sm animate-in fade-in duration-200" />
         
-        {/* モーダル本体 (z-indexをさらに高く設定) */}
         <Dialog.Content 
           className="fixed z-[70] top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 outline-none"
           aria-describedby={undefined}
@@ -63,8 +61,9 @@ export const WatchConfirmModal = ({ isOpen, videoTitle, actionType, onClose, onC
                 {actionType === 'increase' && <PlusCircle size={20} />}
                 {isDecrease && <MinusCircle size={20} />}
                 
-                {isYoutube && 'はい（記録して +100pt 獲得）'}
-                {actionType === 'increase' && 'はい（記録して +100pt 獲得）'}
+                {/* 🌟 修正: 受け取ったポイントを表示 */}
+                {isYoutube && `はい（記録して +${earnedPoints}pt 獲得）`}
+                {actionType === 'increase' && `はい（記録して +${earnedPoints}pt 獲得）`}
                 {isDecrease && 'はい（回数とポイントを減らす）'}
               </button>
 

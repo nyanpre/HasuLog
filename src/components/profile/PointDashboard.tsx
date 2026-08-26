@@ -1,7 +1,7 @@
 // src/components/profile/PointDashboard.tsx
 import { useMemo, useEffect, useRef, useState } from 'react';
 import { X, Trophy, Calendar, Activity, Clock, Loader2, Users } from 'lucide-react'; 
-import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from 'recharts';
 import { doc, getDoc, collection, getDocs } from 'firebase/firestore'; 
 import { db } from '../../firebase';
 import { useUserData } from '../../hooks/useUserData';
@@ -45,6 +45,7 @@ export const PointDashboard = ({ onClose, targetUserId, targetUserName }: Props)
   
   const [selectedStream, setSelectedStream] = useState<StreamData | null>(null);
   const [globalStreamTitles, setGlobalStreamTitles] = useState<Record<string, string>>({});
+  const [globalStreamTypes, setGlobalStreamTypes] = useState<Record<string, string>>({});
 
   const [showSocialModal, setShowSocialModal] = useState(false);
 
@@ -53,10 +54,14 @@ export const PointDashboard = ({ onClose, targetUserId, targetUserName }: Props)
       try {
         const snap = await getDocs(collection(db, "streams"));
         const titlesObj: Record<string, string> = {};
+        const typesObj: Record<string, string> = {};
         snap.forEach(doc => {
-          titlesObj[doc.id] = doc.data().title;
+          const data = doc.data();
+          titlesObj[doc.id] = data.title;
+          typesObj[doc.id] = data.type;
         });
         setGlobalStreamTitles(titlesObj);
+        setGlobalStreamTypes(typesObj);
       } catch (error) {
         console.error("動画タイトルの取得に失敗しました", error);
       }
@@ -155,19 +160,48 @@ export const PointDashboard = ({ onClose, targetUserId, targetUserName }: Props)
     return 'bg-pink-800';
   };
 
+  // 🌟 種別ごとの月別獲得ポイント（積み上げ用データ）
   const chartData = useMemo(() => {
-    const monthlyPoints: Record<string, number> = {};
-    Object.values(records).forEach(record => {
+    const monthlyData: Record<string, {
+      name: string;
+      with_meets: number;
+      with_station: number;
+      fes_live: number;
+      story: number;
+    }> = {};
+
+    Object.entries(records).forEach(([id, record]) => {
       if (record.lastViewedAt) {
         const date = new Date(record.lastViewedAt);
         const month = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-        monthlyPoints[month] = (monthlyPoints[month] || 0) + (record.viewCount * 100);
+        
+        if (!monthlyData[month]) {
+          monthlyData[month] = {
+            name: month,
+            with_meets: 0,
+            with_station: 0,
+            fes_live: 0,
+            story: 0
+          };
+        }
+
+        const type = globalStreamTypes[id] || (record as any).type || 'with_meets';
+        const points = (record.viewCount || 0) * 100;
+
+        if (type === 'fes_live') {
+          monthlyData[month].fes_live += points;
+        } else if (type === 'with_station') {
+          monthlyData[month].with_station += points;
+        } else if (type === 'story') {
+          monthlyData[month].story += points;
+        } else {
+          monthlyData[month].with_meets += points;
+        }
       }
     });
-    return Object.entries(monthlyPoints)
-      .sort((a, b) => a[0].localeCompare(b[0]))
-      .map(([name, points]) => ({ name, points }));
-  }, [records]);
+
+    return Object.values(monthlyData).sort((a, b) => a.name.localeCompare(b.name));
+  }, [records, globalStreamTypes]);
 
   const recentHistory = useMemo(() => {
     return Object.entries(records)
@@ -243,7 +277,6 @@ export const PointDashboard = ({ onClose, targetUserId, targetUserName }: Props)
                 </div>
               </div>
               
-              {/* 🌟 変更: 「フレンド」に変更しました */}
               {targetUserId && (
                 <button
                   onClick={() => setShowSocialModal(true)}
@@ -309,25 +342,33 @@ export const PointDashboard = ({ onClose, targetUserId, targetUserName }: Props)
               </div>
             </div>
 
+            {/* 🌟 積み上げ棒グラフ表示エリア */}
             <div>
               <h4 className="text-xs font-bold text-gray-700 mb-4 flex items-center">
                 <Activity className="w-3.5 h-3.5 mr-1.5 text-gray-700" />
-                月別獲得ポイント推移
+                月別獲得ポイント推移（種別別）
               </h4>
-              <div className="p-4 rounded-lg border border-gray-100 bg-white h-56">
+              <div className="p-4 rounded-lg border border-gray-100 bg-white h-64">
                 {chartData.length > 0 ? (
                   <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={chartData} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
+                    <BarChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
                       <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
                       <YAxis tick={{ fontSize: 10, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
                       <Tooltip 
                         contentStyle={{ borderRadius: '6px', border: '1px solid #e5e7eb', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.05)', fontSize: '11px' }}
                         labelStyle={{ fontWeight: 'bold', color: '#374151', marginBottom: '4px' }}
-                        formatter={(value: any) => [`${value} pt`, 'ポイント']}
+                        formatter={(value: any, name: any) => [`${value} pt`, name]}
                       />
-                      <Line type="monotone" dataKey="points" stroke="#ec4899" strokeWidth={2} dot={{ r: 3, fill: '#ec4899', strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 5 }} />
-                    </LineChart>
+                      <Legend 
+                        wrapperStyle={{ fontSize: '10px', paddingTop: '8px' }}
+                        iconType="circle"
+                      />
+                      <Bar dataKey="with_meets" name="With×MEETS" stackId="points" fill="#ec4899" />
+                      <Bar dataKey="with_station" name="With×STATION" stackId="points" fill="#3b82f6" />
+                      <Bar dataKey="fes_live" name="Fes×LIVE" stackId="points" fill="#10b981" />
+                      <Bar dataKey="story" name="活動記録" stackId="points" fill="#f59e0b" radius={[4, 4, 0, 0]} />
+                    </BarChart>
                   </ResponsiveContainer>
                 ) : (
                   <div className="h-full flex items-center justify-center text-xs text-gray-400">
