@@ -1,60 +1,92 @@
+# backend/upload_firebase.py
 import os
 import json
 import firebase_admin
-from firebase_admin import credentials
-from firebase_admin import firestore
+from firebase_admin import credentials, firestore
 
-# Firebaseコンソールからダウンロードしたサービスアカウントキーのパス
-CRED_PATH = "serviceAccountKey.json"
+# Firebase 初期化
+cred_path = os.path.join(os.path.dirname(__file__), "serviceAccountKey.json")
+if not os.path.exists(cred_path):
+    print("❌ serviceAccountKey.json が backend/ フォルダに見つかりません。")
+    exit(1)
 
-def initialize_firestore():
-    cred = credentials.Certificate(CRED_PATH)
+cred = credentials.Certificate(cred_path)
+if not firebase_admin._apps:
     firebase_admin.initialize_app(cred)
-    return firestore.client()
 
-def upload_data(db, file_name):
-    file_path = os.path.join('data', file_name)
-    if not os.path.exists(file_path):
-        print(f"⚠️ ファイルが見つかりません: {file_path}")
-        return
+db = firestore.client()
 
-    with open(file_path, 'r', encoding='utf-8') as f:
-        data = json.load(f)
+DATA_DIR = os.path.join(os.path.dirname(__file__), "../src/data")
+JSON_FILES = [
+    "withmeets_wiki_data.json",
+    "feslive_wiki_data.json",
+    "withstation_wiki_data.json",
+    "story_wiki_data.json"
+]
 
-    if not data:
-        print(f"⚠️ データが空です: {file_name}")
-        return
+def load_all_json_data():
+    all_streams = []
+    for filename in JSON_FILES:
+        filepath = os.path.join(DATA_DIR, filename)
+        if os.path.exists(filepath):
+            with open(filepath, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                all_streams.extend(data)
+                print(f"📄 読み込み完了: {filename} ({len(data)} 件)")
+        else:
+            print(f"⚠️ スキップ（見つかりません）: {filename}")
+    return all_streams
 
-    # 保存先のコレクション名を指定
-    collection_ref = db.collection('streams')
-    
-    # バッチ処理で効率的にアップロード（上限500件を回避するため400件ずつ処理）
+def upload_streams():
+    streams = load_all_json_data()
+    print(f"\n🚀 合計 {len(streams)} 件のデータをFirestore（streamsコレクション）に送信・更新します...")
+
     batch = db.batch()
-    count = 0
+    batch_count = 0
+    total_uploaded = 0
 
-    try:
-        for item in data:
-            # スクリプトで生成した 'id' をFirestoreのドキュメントIDとしてそのまま使用
-            doc_ref = collection_ref.document(item['id'])
-            batch.set(doc_ref, item)
-            count += 1
-            
-            if count % 400 == 0:
-                batch.commit()
-                batch = db.batch()
+    for stream in streams:
+        stream_id = stream.get("id")
+        if not stream_id:
+            continue
 
-        # 残りのデータをコミット
-        if count % 400 != 0:
+        # 送信するデータ構造を整理（不要なNoneを除去）
+        stream_doc_data = {
+            "id": stream_id,
+            "season": stream.get("season", ""),
+            "type": stream.get("type", ""),
+            "date": stream.get("date", ""),
+            "title": stream.get("title", ""),
+            "participants": stream.get("participants", ""),
+            "youtubeUrl": stream.get("youtubeUrl", ""),
+            "thumbnailUrl": stream.get("thumbnailUrl", ""),
+            "description": stream.get("description", ""),
+            "is_official": stream.get("is_official", True)
+        }
+
+        # 任意フィールドの追加
+        if "raw_title_node" in stream:
+            stream_doc_data["raw_title_node"] = stream["raw_title_node"]
+        if "extraYoutubeUrls" in stream:
+            stream_doc_data["extraYoutubeUrls"] = stream["extraYoutubeUrls"]
+
+        doc_ref = db.collection("streams").document(stream_id)
+        # merge=True で既存フィールドを保持しつつ更新・追加
+        batch.set(doc_ref, stream_doc_data, merge=True)
+        batch_count += 1
+        total_uploaded += 1
+
+        # Firestoreのバッチ上限（500件）ごとにコミット
+        if batch_count >= 450:
             batch.commit()
-            
-        print(f"✅ {count} 件のデータを {file_name} からアップロードしました！")
-    except Exception as e:
-        print(f"❌ アップロードエラー ({file_name}): {e}")
+            print(f"⏳ {total_uploaded} / {len(streams)} 件 送信完了...")
+            batch = db.batch()
+            batch_count = 0
+
+    if batch_count > 0:
+        batch.commit()
+
+    print(f"\n🎉 全 {total_uploaded} 件のマスターデータの送信・更新が完了しました！")
 
 if __name__ == "__main__":
-    if not os.path.exists(CRED_PATH):
-        print(f"❌ エラー: 認証キー '{CRED_PATH}' が同じ階層に見つかりません。")
-    else:
-        db = initialize_firestore()
-        upload_data(db, 'withmeets_wiki_data.json')
-        upload_data(db, 'withstation_wiki_data.json')
+    upload_streams()

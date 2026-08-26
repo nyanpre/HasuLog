@@ -13,10 +13,28 @@ const MEMBERS = [
   "吟子", "小鈴", "姫芽", "セラス", "泉"
 ];
 
+// 🌟 同一日のタイトル順序付けヘルパー
+const parseStoryRank = (title: string): { episodeNum: number; isInterlude: boolean; hasEpisode: boolean } => {
+  const match = title.match(/^第(\d+(?:\.\d+)?)話/);
+  const isInterlude = title.includes("幕間");
+
+  if (match) {
+    return {
+      episodeNum: parseFloat(match[1]),
+      isInterlude,
+      hasEpisode: true
+    };
+  }
+
+  return {
+    episodeNum: 99999,
+    isInterlude: false,
+    hasEpisode: false
+  };
+};
+
 export const StreamList = () => {
   const { records, updateRecord } = useUserRecords();
-  
-  // Contextから受け取る
   const { streams, isLoading: loading, error } = useStreams();
 
   const [columns, setColumns] = useState<1 | 2 | 4>(() => {
@@ -33,7 +51,6 @@ export const StreamList = () => {
   
   const [filterSeason, setFilterSeason] = useState<string>(() => sessionStorage.getItem('hl_season') || "all");
   const [filterType, setFilterType] = useState<string>(() => sessionStorage.getItem('hl_type') || "all");
-  //  視聴状態のフィルターState
   const [filterWatched, setFilterWatched] = useState<string>(() => sessionStorage.getItem('hl_watched') || "all");
   const [sortOrder, setSortOrder] = useState<"desc" | "asc">(() => (sessionStorage.getItem('hl_sort') as "desc" | "asc") || "desc");
   
@@ -52,10 +69,10 @@ export const StreamList = () => {
     sessionStorage.setItem('hl_filterOpen', String(isFilterOpen));
     sessionStorage.setItem('hl_season', filterSeason);
     sessionStorage.setItem('hl_type', filterType);
-    sessionStorage.setItem('hl_watched', filterWatched); // 🌟 追加: セッションに保存
+    sessionStorage.setItem('hl_watched', filterWatched);
     sessionStorage.setItem('hl_sort', sortOrder);
     sessionStorage.setItem('hl_members', JSON.stringify(memberFilters));
-  }, [columns, isFilterOpen, filterSeason, filterType, filterWatched, sortOrder, memberFilters]); // 🌟 追加: 依存配列にfilterWatchedを追加
+  }, [columns, isFilterOpen, filterSeason, filterType, filterWatched, sortOrder, memberFilters]);
 
   const getViewCount = (id: string) => records[id]?.viewCount || 0;
 
@@ -70,7 +87,7 @@ export const StreamList = () => {
   const handleResetFilters = () => {
     setFilterSeason("all");
     setFilterType("all");
-    setFilterWatched("all"); // 🌟 追加: リセット時にallに戻す
+    setFilterWatched("all");
     resetMemberFilters();
   };
 
@@ -78,14 +95,19 @@ export const StreamList = () => {
     let result = [...streams];
 
     if (filterSeason !== "all") {
-      result = result.filter(s => s.season && s.season.startsWith(filterSeason));
+      result = result.filter(s => {
+        if (!s.season) return false;
+        if (filterSeason === "106") {
+          return s.season.startsWith("106") || s.season === "With×STATION" || s.type === "with_station";
+        }
+        return s.season.startsWith(filterSeason);
+      });
     }
     
     if (filterType !== "all") {
       result = result.filter(s => s.type === filterType);
     }
 
-    // 視聴済み/未視聴のフィルタリングロジック
     if (filterWatched !== "all") {
       result = result.filter(s => {
         const viewCount = records[s.id]?.viewCount || 0;
@@ -107,15 +129,57 @@ export const StreamList = () => {
       });
     }
 
-    return sortOrder === "asc" ? result.reverse() : result;
-  }, [streams, filterSeason, filterType, filterWatched, memberFilters, sortOrder, records]); // 🌟 追加: filterWatched と records を依存配列に追加
+    result.sort((a, b) => {
+      // 🌟 102期を無条件で「最も古いもの」として扱う処理
+      const is102A = a.season === "102期";
+      const is102B = b.season === "102期";
+      
+      if (is102A !== is102B) {
+        if (is102A) return sortOrder === "desc" ? 1 : -1;
+        if (is102B) return sortOrder === "desc" ? -1 : 1;
+      }
+
+      const timeA = new Date(a.date || 0).getTime();
+      const timeB = new Date(b.date || 0).getTime();
+
+      if (timeA !== timeB) {
+        return sortOrder === "desc" ? timeB - timeA : timeA - timeB;
+      }
+
+      const rankA = parseStoryRank(a.title || "");
+      const rankB = parseStoryRank(b.title || "");
+
+      let diff = 0;
+
+      if (rankA.hasEpisode && rankB.hasEpisode) {
+        if (rankA.episodeNum !== rankB.episodeNum) {
+          diff = rankA.episodeNum - rankB.episodeNum;
+        } else {
+          if (rankA.isInterlude !== rankB.isInterlude) {
+            diff = rankA.isInterlude ? 1 : -1;
+          } else {
+            diff = a.title.localeCompare(b.title, 'ja');
+          }
+        }
+      } else if (rankA.hasEpisode && !rankB.hasEpisode) {
+        diff = -1;
+      } else if (!rankA.hasEpisode && rankB.hasEpisode) {
+        diff = 1;
+      } else {
+        diff = a.title.localeCompare(b.title, 'ja');
+      }
+
+      return sortOrder === "desc" ? -diff : diff;
+    });
+
+    return result;
+  }, [streams, filterSeason, filterType, filterWatched, memberFilters, sortOrder, records]);
 
   if (loading) return <div className="p-5 text-center text-gray-500">データを読み込み中...</div>;
   if (error) return <div className="p-5 text-center text-red-500">{error}</div>;
 
   const gridClass = columns === 1 ? "grid-cols-1" : columns === 2 ? "grid-cols-2" : "grid-cols-2 md:grid-cols-3 lg:grid-cols-4";
   const isFilteringMembers = Object.values(memberFilters).some(state => state !== "none");
-  // 🌟 追加: filterWatched の判定を追加
   const isAnyFilterActive = filterSeason !== "all" || filterType !== "all" || filterWatched !== "all" || isFilteringMembers;
 
   return (
@@ -152,20 +216,21 @@ export const StreamList = () => {
 
               <select value={filterSeason} onChange={(e) => setFilterSeason(e.target.value)} className="text-xs sm:text-sm py-1.5 pl-2 pr-8 border-gray-300 rounded-md shadow-sm focus:border-blue-300 focus:ring-0">
                 <option value="all">すべての期</option>
+                <option value="102">102期</option>
                 <option value="103">103期</option>
                 <option value="104">104期</option>
                 <option value="105">105期</option>
+                <option value="106">106期</option>
               </select>
 
               <select value={filterType} onChange={(e) => setFilterType(e.target.value)} className="text-xs sm:text-sm py-1.5 pl-2 pr-8 border-gray-300 rounded-md shadow-sm focus:border-blue-300 focus:ring-0">
                 <option value="all">すべての配信</option>
                 <option value="with_meets">With×MEETS</option>
                 <option value="with_station">With×STATION</option>
-                {/* 🌟 変更: Fes×LIVE のフィルターを追加 */}
                 <option value="fes_live">Fes×LIVE</option>
+                <option value="story">活動記録</option>
               </select>
 
-              {/* 視聴状態のフィルターUI */}
               <select value={filterWatched} onChange={(e) => setFilterWatched(e.target.value)} className="text-xs sm:text-sm py-1.5 pl-2 pr-8 border-gray-300 rounded-md shadow-sm focus:border-blue-300 focus:ring-0">
                 <option value="all">視聴/未視聴 すべて</option>
                 <option value="watched">視聴済み</option>

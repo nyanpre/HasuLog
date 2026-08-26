@@ -1,6 +1,7 @@
 // src/components/stream/StreamCard.tsx
 import { useState } from "react";
 import { useAuth } from "../../contexts/AuthContext";
+import { useUserData } from "../../hooks/useUserData";
 import { addWatchRecord, removeWatchRecord } from "../../utils/pointSystem";
 import { WatchConfirmModal } from "../common/WatchConfirmModal";
 import type { StreamData } from "../../types";
@@ -14,9 +15,19 @@ type Props = {
 
 export const StreamCard = ({ stream, columns, viewCount, onClick }: Props) => {
   const { currentUser } = useAuth();
+  const { userData } = useUserData();
   
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [actionMode, setActionMode] = useState<'increase' | 'decrease'>('increase');
+
+  // 🌟 判定ロジック
+  const isExUser = Boolean(currentUser && userData?.exMode === true);
+  const isOfficialStream = stream.is_official !== false && (stream.is_official as any) !== "false";
+  const isRestrictedType = stream.type === "fes_live" || stream.type === "story";
+
+  // 🌟 「Fes×LIVE」または「活動記録」の「非公式動画」は、exModeユーザー以外サムネイル非表示
+  const shouldShowThumbnail = Boolean(stream.thumbnailUrl) &&
+    (!(isRestrictedType && !isOfficialStream) || isExUser);
 
   const handleOpenConfirm = (mode: 'increase' | 'decrease', e: React.MouseEvent) => {
     e.stopPropagation(); 
@@ -40,13 +51,15 @@ export const StreamCard = ({ stream, columns, viewCount, onClick }: Props) => {
     }
   };
 
-  // 🌟 バッジの出し分け（Fes×LIVE対応）
   const getBadgeInfo = () => {
     if (stream.type === "with_meets") {
       return { text: "MEETS", bg: "bg-pink-500" };
     }
     if (stream.type === "fes_live") {
       return { text: "Fes×LIVE", bg: "bg-emerald-500" };
+    }
+    if (stream.type === "story") {
+      return { text: "活動記録", bg: "bg-amber-500" };
     }
     return { text: "STATION", bg: "bg-blue-500" };
   };
@@ -63,10 +76,16 @@ export const StreamCard = ({ stream, columns, viewCount, onClick }: Props) => {
       <div className={`relative bg-gray-100 flex-shrink-0 flex items-center justify-center ${
         columns === 1 ? "w-full sm:w-1/3 md:w-64 aspect-video sm:aspect-auto border-b sm:border-b-0 sm:border-r border-gray-100" : "w-full aspect-video"
       }`}>
-        {stream.thumbnailUrl ? (
-          <img src={stream.thumbnailUrl} alt={stream.title} className={`w-full h-full object-cover ${columns === 1 ? "sm:absolute sm:inset-0" : ""}`} />
+        {shouldShowThumbnail ? (
+          <img 
+            src={stream.thumbnailUrl} 
+            alt={stream.title} 
+            className={`w-full h-full object-cover ${columns === 1 ? "sm:absolute sm:inset-0" : ""}`} 
+          />
         ) : (
-          <div className="w-full h-full flex items-center justify-center text-gray-400 text-xs">No Image</div>
+          <div className="w-full h-full flex flex-col items-center justify-center text-gray-400 text-xs font-medium bg-gray-100">
+            <span>No Image</span>
+          </div>
         )}
         <span className={`absolute top-1 left-1 sm:top-2 sm:left-2 text-white px-1.5 py-0.5 rounded text-[9px] sm:text-[10px] font-bold ${badge.bg}`}>
           {badge.text}
@@ -92,7 +111,7 @@ export const StreamCard = ({ stream, columns, viewCount, onClick }: Props) => {
           )}
 
           {columns === 1 && stream.description && (
-            <p className="text-xs text-gray-500 mt-2 line-clamp-2 leading-relaxed">
+            <p className="text-xs text-gray-500 mt-2 line-clamp-2 leading-relaxed whitespace-pre-line">
               {stream.description}
             </p>
           )}

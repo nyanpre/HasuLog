@@ -1,9 +1,12 @@
 // src/types/index.ts
 
+// 🌟 配信種別のユニオン型（活動記録 'story' を追加）
+export type StreamType = 'with_meets' | 'fes_live' | 'with_station' | 'story' | string;
+
 export interface StreamData {
   id: string;
   season: string;
-  type: string;
+  type: StreamType;
   date: string;
   title: string;
   participants: string;
@@ -17,7 +20,7 @@ export interface StreamData {
 
 export interface VideoData {
   id: string;
-  type: string;
+  type: StreamType;
   date: string;
   title: string;
   thumbnailUrl: string;

@@ -111,8 +111,14 @@ export const StreamDetailModal = ({ stream, record, onClose, onUpdateRecord, isR
     } 
   };
 
-  // 公式・非公式とexModeの判定
+  // 🌟 公式・非公式とexModeの判定
   const isOfficialStream = stream ? (stream.is_official !== false && (stream.is_official as any) !== "false") : false;
+  const isExUser = Boolean(currentUser && userData?.exMode === true);
+  const isRestrictedType = stream ? (stream.type === "fes_live" || stream.type === "story") : false;
+
+  // 🌟 サムネイル表示の判定 (非公式かつ制限されたタイプならexModeのみ表示)
+  const shouldShowThumbnail = Boolean(stream?.thumbnailUrl) &&
+    (!(isRestrictedType && !isOfficialStream) || isExUser);
 
   const canShowYoutubeLink = () => {
     if (!stream) return false;
@@ -177,11 +183,13 @@ export const StreamDetailModal = ({ stream, record, onClose, onUpdateRecord, isR
 
                 <div className="overflow-y-auto p-4 sm:p-5 custom-scrollbar">
                   
-                  <div className="w-full aspect-video bg-gray-900 rounded-lg overflow-hidden mb-4">
-                    {stream.thumbnailUrl ? (
+                  <div className="w-full aspect-video bg-gray-900 rounded-lg overflow-hidden mb-4 flex items-center justify-center">
+                    {shouldShowThumbnail ? (
                       <img src={stream.thumbnailUrl} alt={stream.title} className="w-full h-full object-contain" />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center text-gray-500 text-xs">No Image</div>
+                      <div className="w-full h-full flex items-center justify-center text-gray-500 text-xs">
+                        No Image
+                      </div>
                     )}
                   </div>
 

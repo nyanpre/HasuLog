@@ -6,7 +6,8 @@ import type { StreamData } from '../types';
 // 🌟 JSONデータをフロントエンドに直接インポート！
 import withmeetsData from '../data/withmeets_wiki_data.json';
 import withstationData from '../data/withstation_wiki_data.json';
-import fesliveData from '../data/feslive_wiki_data.json'; // 🌟 追加: Fes×LIVEデータ
+import fesliveData from '../data/feslive_wiki_data.json';
+import storyData from '../data/story_wiki_data.json'; // 🌟 追加: 活動記録データ
 
 type StreamContextType = {
   streams: StreamData[];
@@ -23,11 +24,12 @@ export const StreamProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     try {
-      // 1. 3つのJSONデータを合体させる (🌟 fesliveData を追加)
+      // 1. 4つのJSONデータを合体させる (🌟 storyData を追加)
       const allStreams = [
         ...(withmeetsData as StreamData[]),
         ...(withstationData as StreamData[]),
-        ...(fesliveData as StreamData[])
+        ...(fesliveData as StreamData[]),
+        ...(storyData as StreamData[])
       ];
       
       // 2. 日付の新しい順（降順）に並び替え
@@ -43,7 +45,7 @@ export const StreamProvider = ({ children }: { children: ReactNode }) => {
       console.error("データの読み込みに失敗しました:", err);
       setError("データの読み込みに失敗しました。");
     } finally {
-      setIsLoading(false); // ロード完了（一瞬で終わります）
+      setIsLoading(false); // ロード完了
     }
   }, []);
 
