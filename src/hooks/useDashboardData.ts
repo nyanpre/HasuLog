@@ -4,6 +4,8 @@ import { doc, getDoc, collection, getDocs } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useUserData } from './useUserData';
 import { useUserRecords } from './useUserRecords';
+import { useAuth } from '../contexts/AuthContext';
+import { useStreams } from '../contexts/StreamContext'; // 🌟 追加: JSON由来の動画データを利用
 import { getStreamPoints } from '../utils/pointSystem';
 import type { StreamRecord } from './useUserRecords';
 
@@ -34,35 +36,29 @@ const parseTimestamp = (val: any, fallbackStr: string | undefined) => {
 };
 
 export const useDashboardData = (targetUserId?: string) => {
+  const { currentUser } = useAuth();
   const { userData: myData } = useUserData();
   const { records: myRecords, updateRecord: myUpdateRecord } = useUserRecords();
+  const { streams: streamsData } = useStreams(); // 🌟 追加: Firestore通信を廃止してJSONを使う
   
+  const isExUser = Boolean(currentUser && myData?.exMode === true);
+
   const [targetData, setTargetData] = useState<any>(null);
   const [targetRecords, setTargetRecords] = useState<Record<string, StreamRecord>>({});
   const [isLoading, setIsLoading] = useState(!!targetUserId);
-  
-  const [globalStreamTitles, setGlobalStreamTitles] = useState<Record<string, string>>({});
-  const [globalStreamTypes, setGlobalStreamTypes] = useState<Record<string, string>>({});
 
-  useEffect(() => {
-    const fetchStreams = async () => {
-      try {
-        const snap = await getDocs(collection(db, "streams"));
-        const titlesObj: Record<string, string> = {};
-        const typesObj: Record<string, string> = {};
-        snap.forEach(doc => {
-          const data = doc.data();
-          titlesObj[doc.id] = data.title;
-          typesObj[doc.id] = data.type;
-        });
-        setGlobalStreamTitles(titlesObj);
-        setGlobalStreamTypes(typesObj);
-      } catch (error) {
-        console.error("動画タイトルの取得に失敗しました", error);
-      }
-    };
-    fetchStreams();
-  }, []);
+  // 🌟 JSONデータからタイトル、タイプ、公式フラグの辞書を高速化のために作成
+  const streamInfoMap = useMemo(() => {
+    const map: Record<string, { title: string; type: string; isOfficial: boolean }> = {};
+    streamsData.forEach(s => {
+      map[s.id] = {
+        title: s.title,
+        type: s.type,
+        isOfficial: s.is_official !== false && String(s.is_official) !== "false"
+      };
+    });
+    return map;
+  }, [streamsData]);
 
   useEffect(() => {
     if (!targetUserId) return;
@@ -87,12 +83,28 @@ export const useDashboardData = (targetUserId?: string) => {
   }, [targetUserId]);
 
   const userData = targetUserId ? targetData : myData;
-  const records = targetUserId ? targetRecords : myRecords;
+  const rawRecords = targetUserId ? targetRecords : myRecords;
+
+  // 🌟 【最重要】非認証ユーザーには非公式動画の履歴を隠蔽するフィルタリング
+  const visibleRecords = useMemo(() => {
+    const filtered: Record<string, StreamRecord> = {};
+    Object.entries(rawRecords).forEach(([id, record]) => {
+      const info = streamInfoMap[id];
+      const isOfficial = info ? info.isOfficial : false;
+      
+      if (!isExUser && !isOfficial) {
+        return; // 除外して画面に出さない
+      }
+      filtered[id] = record;
+    });
+    return filtered;
+  }, [rawRecords, streamInfoMap, isExUser]);
 
   const heatMapData = useMemo(() => {
     const dayMap: Record<string, { count: number; totalPoints: number; items: DayStreamItem[] }> = {};
 
-    Object.entries(records).forEach(([id, record]) => {
+    // 以降、rawRecords ではなく visibleRecords を使用する
+    Object.entries(visibleRecords).forEach(([id, record]) => {
       if (record.lastViewedAt && (record.viewCount || 0) > 0) {
         const d = new Date(record.lastViewedAt);
         const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -101,11 +113,11 @@ export const useDashboardData = (targetUserId?: string) => {
           dayMap[dateStr] = { count: 0, totalPoints: 0, items: [] };
         }
 
-        const type = globalStreamTypes[id] || (record as any).type || 'with_meets';
+        const type = streamInfoMap[id]?.type || (record as any).type || 'with_meets';
         const isRecommended = (record as any).lastAction === 'recommended_watch';
         const pointPerView = getStreamPoints(type, false) + (isRecommended ? 100 : 0);
         const earned = (record.viewCount || 1) * pointPerView + ((record as any).memoPointsAwarded ? 50 : 0);
-        const title = (record as any).streamTitle || (record as any).title || globalStreamTitles[id] || '視聴記録';
+        const title = streamInfoMap[id]?.title || (record as any).streamTitle || (record as any).title || '視聴記録';
 
         dayMap[dateStr].count += record.viewCount;
         dayMap[dateStr].totalPoints += earned;
@@ -154,7 +166,7 @@ export const useDashboardData = (targetUserId?: string) => {
       }
     }
     return grid;
-  }, [records, globalStreamTitles, globalStreamTypes]);
+  }, [visibleRecords, streamInfoMap]);
 
   const chartData = useMemo(() => {
     const monthlyData: Record<string, {
@@ -173,10 +185,10 @@ export const useDashboardData = (targetUserId?: string) => {
       }
     };
 
-    Object.entries(records).forEach(([id, record]) => {
+    Object.entries(visibleRecords).forEach(([id, record]) => {
       const viewCount = record.viewCount || 0;
       if (viewCount > 0 && record.lastViewedAt) {
-        const type = globalStreamTypes[id] || (record as any).type || 'with_meets';
+        const type = streamInfoMap[id]?.type || (record as any).type || 'with_meets';
         const isRecommended = (record as any).lastAction === 'recommended_watch';
         
         const pointPerView = getStreamPoints(type, false);
@@ -254,23 +266,23 @@ export const useDashboardData = (targetUserId?: string) => {
     }
 
     return Object.values(monthlyData).sort((a, b) => a.name.localeCompare(b.name));
-  }, [records, globalStreamTypes, userData]);
+  }, [visibleRecords, streamInfoMap, userData]);
 
   const recentHistory = useMemo(() => {
-    return Object.entries(records)
+    return Object.entries(visibleRecords)
       .filter(([_, record]) => (record as any).lastAction !== 'decrease' && record.viewCount > 0)
       .map(([id, record]) => {
         const anyRecord = record as any;
         const ts = parseTimestamp(anyRecord.updatedAt, anyRecord.lastViewedAt);
         const date = new Date(ts);
         
-        const type = globalStreamTypes[id] || anyRecord.type || 'with_meets';
+        const type = streamInfoMap[id]?.type || anyRecord.type || 'with_meets';
         const isRecommended = anyRecord.lastAction === 'recommended_watch';
         const pointPerView = getStreamPoints(type, false) + (isRecommended ? 100 : 0);
         
         return {
           id,
-          title: anyRecord.streamTitle || anyRecord.title || globalStreamTitles[id] || '視聴記録',
+          title: streamInfoMap[id]?.title || anyRecord.streamTitle || anyRecord.title || '視聴記録',
           dateStr: `${date.getFullYear()}/${String(date.getMonth() + 1).padStart(2, '0')}/${String(date.getDate()).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`,
           timestamp: ts,
           viewCount: record.viewCount || 0,
@@ -281,7 +293,7 @@ export const useDashboardData = (targetUserId?: string) => {
       .filter(item => item.timestamp > 0)
       .sort((a, b) => b.timestamp - a.timestamp)
       .slice(0, 15);
-  }, [records, globalStreamTitles, globalStreamTypes]);
+  }, [visibleRecords, streamInfoMap]);
 
   return {
     userData,

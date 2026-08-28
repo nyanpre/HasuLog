@@ -8,8 +8,9 @@ import { useAuth } from '../../contexts/AuthContext';
 import { StreamDetailModal } from '../stream/StreamDetailModal';
 import { useUserRecords } from '../../hooks/useUserRecords';
 import type { StreamData } from '../../types';
-// 🌟 追加: StreamContext から本物の動画データを取得するフックをインポート
 import { useStreams } from '../../contexts/StreamContext';
+// 🌟 追加: userDataを取得するためにインポート
+import { useUserData } from '../../hooks/useUserData';
 
 const timelineCache = { data: [] as TimelineItem[], timestamp: 0 };
 const CACHE_DURATION = 5 * 60 * 1000; 
@@ -30,7 +31,10 @@ export const FriendTimeline = () => {
   const { currentUser } = useAuth();
   const { records: myRecords, updateRecord: myUpdateRecord } = useUserRecords();
   
-  // 🌟 追加: ContextからJSON由来の全動画データを受け取る
+  // 🌟 追加: 現在のユーザーが exMode（認証ユーザー）かどうかを判定
+  const { userData } = useUserData();
+  const isExUser = Boolean(currentUser && userData?.exMode === true);
+  
   const { streams: streamsData } = useStreams();
   
   const [timeline, setTimeline] = useState<TimelineItem[]>([]);
@@ -65,7 +69,7 @@ export const FriendTimeline = () => {
 
       const promises = targetUsers.map(async (user) => {
         const recordsRef = collection(db, 'users', user.uid, 'watchHistory');
-        const q = query(recordsRef, orderBy('updatedAt', 'desc'), limit(8)); 
+        const q = query(recordsRef, orderBy('updatedAt', 'desc'), limit(15)); // 🌟 少し多めに取得（除外される分をカバーするため）
         
         try {
           const snapshot = await getDocs(q);
@@ -84,9 +88,17 @@ export const FriendTimeline = () => {
               activityTime = new Date(data.lastViewedAt).getTime();
             }
 
-            // 🌟 ここで Context から受け取った本物の streamsData を使ってタイトルを探します
             const localStream = streamsData.find(s => s.id === doc.id);
             const streamTitle = localStream?.title || data.streamTitle || data.title || '視聴記録';
+
+            // 🌟 【最重要ロジック】非公式動画の除外
+            // jsonデータの is_official フラグを確認（明示的に false なものを非公式とする）
+            const isOfficialStream = localStream ? (localStream.is_official !== false && (localStream.is_official as any) !== "false") : false;
+            
+            // 自分が exMode でない（非認証ユーザー）かつ、その動画が非公式の場合は、配列に追加せずスキップ！
+            if (!isExUser && !isOfficialStream) {
+              return; 
+            }
 
             if (activityTime > 0) {
               allLogs.push({
@@ -120,10 +132,9 @@ export const FriendTimeline = () => {
       setLoading(false);
       setIsRefreshing(false);
     }
-  }, [currentUser, friends, streamsData]); // 🌟 依存配列に streamsData を追加
+  }, [currentUser, friends, streamsData, isExUser]); // 🌟 依存配列に isExUser を追加
 
   useEffect(() => {
-    // 🌟 streamsData が空の間（読み込み中）は実行を待つ
     if (streamsData.length > 0) {
       fetchTimeline();
     }
@@ -143,7 +154,6 @@ export const FriendTimeline = () => {
   };
 
   const handleOpenStreamDetail = (streamId: string) => {
-    // 🌟 本物の streamsData からデータを検索する
     const stream = streamsData.find(s => s.id === streamId);
     if (stream) {
       setSelectedStream(stream);
