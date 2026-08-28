@@ -12,11 +12,9 @@ export const getRankInfo = (points: number) => {
   return { rank: "Unranked", label: "White", color: "text-gray-400", bg: "bg-white", border: "border border-gray-200", nextAt: 100 };
 };
 
-// 🌟 追加: 種別とおすすめ状態から獲得ポイントを計算する関数
 export const getStreamPoints = (streamType: string, isRecommended: boolean = false) => {
   if (streamType === "story") return 500;
   if (streamType === "fes_live") return 300;
-  // with_meets, with_station は通常100pt、おすすめ200pt
   return isRecommended ? 200 : 100;
 };
 
@@ -25,11 +23,10 @@ export const addWatchRecord = async (
   streamId: string, 
   streamTitle: string,
   isRecommended: boolean = false,
-  streamType: string = "with_meets" // 🌟 追加: 動画種別を受け取る
+  streamType: string = "with_meets"
 ) => {
   if (!userId || !streamId) return;
 
-  // 🌟 種別に応じたポイントを計算
   const earnedPoints = getStreamPoints(streamType, isRecommended);
   const actionMessage = isRecommended 
     ? `【今日のおすすめ】「${streamTitle}」を視聴して ${earnedPoints}pt 獲得しました！` 
@@ -53,17 +50,20 @@ export const addWatchRecord = async (
     }
   }
 
+  // 🌟 新仕様: pointsBreakdown（月別内訳）を一緒に記録する
   if (!userSnap.exists() || isNewMonth) {
     await setDoc(userRef, {
       monthlyPoints: earnedPoints,
       totalPoints: increment(earnedPoints),
       lastResetMonth: currentMonth,
+      [`pointsBreakdown.${currentMonth}.${streamType}`]: increment(earnedPoints),
       updatedAt: serverTimestamp()
     }, { merge: true });
   } else {
     await updateDoc(userRef, {
       monthlyPoints: increment(earnedPoints),
       totalPoints: increment(earnedPoints),
+      [`pointsBreakdown.${currentMonth}.${streamType}`]: increment(earnedPoints),
       updatedAt: serverTimestamp()
     });
   }
@@ -83,8 +83,8 @@ export const addWatchRecord = async (
       viewCount: 1,
       isFavorite: false,
       memo: "",
-      memoVisibility: "private", // デフォルト非公開
-      memoPointsAwarded: false, // 🌟 ポイント付与済みフラグ
+      memoVisibility: "private",
+      memoPointsAwarded: false,
       lastViewedAt: now.toISOString(),
       lastAction: actionType,
       createdAt: serverTimestamp(),
@@ -105,12 +105,13 @@ export const removeWatchRecord = async (
   userId: string, 
   streamId: string, 
   streamTitle: string,
-  streamType: string = "with_meets" // 🌟 追加
+  streamType: string = "with_meets"
 ) => {
   if (!userId || !streamId) return;
 
-  // 🌟 取り消し時はベースポイント（おすすめボーナスなし）を引く仕様
   const deductPoints = getStreamPoints(streamType, false);
+  const now = new Date();
+  const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 
   const userRef = doc(db, "users", userId);
   const recordRef = doc(db, `users/${userId}/watchHistory`, streamId);
@@ -120,6 +121,7 @@ export const removeWatchRecord = async (
     await updateDoc(userRef, {
       monthlyPoints: increment(-deductPoints),
       totalPoints: increment(-deductPoints),
+      [`pointsBreakdown.${currentMonth}.${streamType}`]: increment(-deductPoints),
       updatedAt: serverTimestamp()
     });
   }
@@ -145,7 +147,6 @@ export const removeWatchRecord = async (
   });
 };
 
-// 🌟 追加: メモ公開時の50ptボーナス付与・解除
 export const updateMemoBonus = async (
   userId: string,
   streamTitle: string,
@@ -153,7 +154,10 @@ export const updateMemoBonus = async (
 ) => {
   if (!userId) return;
 
+  const now = new Date();
+  const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   const points = isAdding ? 50 : -50;
+  
   const userRef = doc(db, "users", userId);
   
   const userSnap = await getDoc(userRef);
@@ -161,6 +165,7 @@ export const updateMemoBonus = async (
     await updateDoc(userRef, {
       monthlyPoints: increment(points),
       totalPoints: increment(points),
+      [`pointsBreakdown.${currentMonth}.memo`]: increment(points),
       updatedAt: serverTimestamp()
     });
   }

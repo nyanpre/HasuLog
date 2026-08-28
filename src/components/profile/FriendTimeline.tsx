@@ -11,8 +11,6 @@ import type { StreamData } from '../../types';
 // 🌟 追加: StreamContext から本物の動画データを取得するフックをインポート
 import { useStreams } from '../../contexts/StreamContext';
 
-// ※仮置きしていた const streamsData = [] は削除しました！
-
 const timelineCache = { data: [] as TimelineItem[], timestamp: 0 };
 const CACHE_DURATION = 5 * 60 * 1000; 
 
