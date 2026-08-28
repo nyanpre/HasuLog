@@ -17,13 +17,14 @@ export const HeatmapSection = ({ heatMapData, onDayClick }: Props) => {
     }
   }, [heatMapData]);
 
-  const getGrassColor = (count: number | undefined) => {
-    if (count === undefined) return 'bg-transparent';
-    if (count === 0) return 'bg-gray-100';
-    if (count <= 1) return 'bg-pink-200';
-    if (count <= 3) return 'bg-pink-400';
-    if (count <= 5) return 'bg-pink-600';
-    return 'bg-pink-800';
+  // 🌟 回数ではなく「ポイント（totalPoints）」を基準に色を決定するように修正
+  const getGrassColor = (points: number | undefined) => {
+    if (!points || points < 100) return 'bg-gray-100'; // 0〜99pt（未視聴など）
+    if (points < 300) return 'bg-pink-200';            // 100pt以上
+    if (points < 600) return 'bg-pink-400';            // 400pt以上
+    if (points < 1000) return 'bg-pink-600';           // 800pt以上
+    if (points < 1200) return 'bg-pink-700';           // 1200pt以上
+    return 'bg-pink-800';                              // 1600pt以上
   };
 
   return (
@@ -33,7 +34,7 @@ export const HeatmapSection = ({ heatMapData, onDayClick }: Props) => {
           <Calendar className="w-3.5 h-3.5 mr-1.5 text-gray-700" />
           過去1年間の視聴履歴
         </h4>
-        <span className="text-[10px] text-gray-400">マスを押すと該当動画を表示</span>
+        <span className="text-[10px] text-gray-400">マスを押すと詳細を表示</span>
       </div>
       
       <div className="p-4 rounded-lg border border-gray-100 bg-white">
@@ -55,18 +56,15 @@ export const HeatmapSection = ({ heatMapData, onDayClick }: Props) => {
                   </div>
                   {week.map((day, dayIdx) => {
                     const hasItems = (day?.items?.length || 0) > 0;
-                    const tooltipText = day 
-                      ? `${day.date}\n・視聴回数: ${day.count}回\n・獲得ポイント: ${day.totalPoints} pt${hasItems ? '\n\n（クリックで一覧表示）' : ''}`
-                      : '';
-
+                    
                     return (
                       <div 
                         key={dayIdx} 
                         onClick={() => { if (hasItems && day) onDayClick(day); }}
-                        className={`w-[12px] h-[12px] rounded-[2px] ${getGrassColor(day?.count)} transition-all ${
+                        // 🌟 引数を day?.count から day?.totalPoints に変更
+                        className={`w-[12px] h-[12px] rounded-[2px] ${getGrassColor(day?.totalPoints)} transition-all ${
                           hasItems ? 'hover:ring-2 hover:ring-pink-500 cursor-pointer active:scale-95' : 'cursor-default'
                         }`}
-                        title={tooltipText}
                       />
                     );
                   })}
@@ -76,12 +74,14 @@ export const HeatmapSection = ({ heatMapData, onDayClick }: Props) => {
           </div>
         </div>
         
+        {/* 🌟 凡例の色も新しいポイント基準に合わせたグラデーションに修正 */}
         <div className="flex items-center justify-end gap-1 mt-2 text-[10px] text-gray-500">
           <span>少ない</span>
           <div className="w-[12px] h-[12px] rounded-[2px] bg-gray-100" />
           <div className="w-[12px] h-[12px] rounded-[2px] bg-pink-200" />
           <div className="w-[12px] h-[12px] rounded-[2px] bg-pink-400" />
           <div className="w-[12px] h-[12px] rounded-[2px] bg-pink-600" />
+          <div className="w-[12px] h-[12px] rounded-[2px] bg-pink-700" />
           <div className="w-[12px] h-[12px] rounded-[2px] bg-pink-800" />
           <span>多い</span>
         </div>
