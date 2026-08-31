@@ -84,7 +84,6 @@ export const addWatchRecord = async (
       isFavorite: false,
       memo: "",
       memoVisibility: "private",
-      memoPointsAwarded: false,
       lastViewedAt: now.toISOString(),
       lastAction: actionType,
       createdAt: serverTimestamp(),
@@ -145,38 +144,4 @@ export const removeWatchRecord = async (
     type: "remove_watch",
     createdAt: serverTimestamp()
   });
-};
-
-export const updateMemoBonus = async (
-  userId: string,
-  streamTitle: string,
-  isAdding: boolean
-) => {
-  if (!userId) return;
-
-  const now = new Date();
-  const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-  const points = isAdding ? 50 : -50;
-  
-  const userRef = doc(db, "users", userId);
-  
-  const userSnap = await getDoc(userRef);
-  if (userSnap.exists()) {
-    await updateDoc(userRef, {
-      monthlyPoints: increment(points),
-      totalPoints: increment(points),
-      [`pointsBreakdown.${currentMonth}.memo`]: increment(points),
-      updatedAt: serverTimestamp()
-    });
-  }
-
-  if (isAdding) {
-    const timelineRef = collection(db, "timeline");
-    await addDoc(timelineRef, {
-      userId,
-      message: `「${streamTitle}」のメモを公開して 50pt 獲得しました！`,
-      type: "memo_public",
-      createdAt: serverTimestamp()
-    });
-  }
 };

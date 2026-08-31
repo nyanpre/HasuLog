@@ -30,7 +30,7 @@ export const PointsChartSection = ({ chartData }: Props) => {
               <Bar dataKey="with_station" name="With×STATION" stackId="points" fill="#3b82f6" />
               <Bar dataKey="fes_live" name="Fes×LIVE" stackId="points" fill="#10b981" />
               <Bar dataKey="story" name="活動記録" stackId="points" fill="#f59e0b" />
-              <Bar dataKey="memo" name="メモボーナス" stackId="points" fill="#8b5cf6" />
+              {/* 🌟 修正: 以下の「メモボーナス」の行を削除しました */}
               <Bar dataKey="recommended_bonus" name="おすすめ視聴ボーナス" stackId="points" fill="#14b8a6" />
             </BarChart>
           </ResponsiveContainer>

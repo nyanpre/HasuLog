@@ -1,8 +1,11 @@
 // src/components/stream/StreamDetailModal.tsx
 import { useState, useEffect } from "react";
 import * as Dialog from '@radix-ui/react-dialog';
+import { doc, setDoc, updateDoc, deleteField } from 'firebase/firestore';
+import { db } from '../../firebase';
 import { useAuth } from "../../contexts/AuthContext";
-import { addWatchRecord, removeWatchRecord, updateMemoBonus, getStreamPoints } from "../../utils/pointSystem";
+// 🌟 修正: updateMemoBonus を削除
+import { addWatchRecord, removeWatchRecord, getStreamPoints } from "../../utils/pointSystem";
 import { WatchConfirmModal } from "../common/WatchConfirmModal";
 import { usePublicMemos } from "../../hooks/usePublicMemos";
 import { useUserData } from "../../hooks/useUserData";
@@ -35,51 +38,49 @@ export const StreamDetailModal = ({ stream, record, onClose, onUpdateRecord, isR
     setSaveStatus("idle");
   }, [record, stream]);
 
-  // 🌟 保存時のロジックをここに集約
+  // 🌟 修正: メモボーナス関連の処理とポップアップを完全削除し、シンプルに保存するだけに変更
   const handleSaveMemo = async () => {
     if (typeof onUpdateRecord !== 'function' || !stream || !currentUser) return;
     
-    let finalVisibility = visibility;
-    const isCurrentlyAwarded = record?.memoPointsAwarded || false;
-
-    // 1. 公開提案ポップアップ
-    if (visibility === 'private' && localMemo.trim() !== '' && !isCurrentlyAwarded) {
-      const wantPublic = window.confirm(
-        "メモを公開しませんか？【50pt】\n\n公開設定（匿名または記名）にして保存すると、50ptを獲得できます！\n\n[OK] 「公開（匿名）」に変更して保存する\n[キャンセル] 「非公開」のまま保存する"
-      );
-      if (wantPublic) {
-        finalVisibility = 'public_anonymous';
-        setVisibility('public_anonymous');
-      }
-    }
-
     setSaveStatus("saving");
     try {
-      const isPublic = finalVisibility === 'public_anonymous' || finalVisibility === 'public_named';
+      const isPublic = visibility === 'public_anonymous' || visibility === 'public_named';
       const hasText = localMemo.trim() !== '';
-      let willBeAwarded = isCurrentlyAwarded;
 
-      // 2. ポイントの付与・回収処理
-      if (isPublic && hasText && !isCurrentlyAwarded) {
-        await updateMemoBonus(currentUser.uid, stream.title, true);
-        willBeAwarded = true;
-      } else if ((!isPublic || !hasText) && isCurrentlyAwarded) {
-        await updateMemoBonus(currentUser.uid, stream.title, false);
-        willBeAwarded = false;
-      }
-
-      // 3. レコードの保存
+      // 自分のレコードの保存
       await onUpdateRecord(stream.id, { 
         streamId: stream.id,
         memo: localMemo,
-        memoVisibility: finalVisibility,
-        memoPointsAwarded: willBeAwarded, // 更新されたフラグを保存
+        memoVisibility: visibility,
         userName: currentUser?.displayName || '名無しユーザー',
         lastAction: 'memo',
         updatedAt: new Date().toISOString()
       });
+
+      // サマリードキュメント（みんなのメモ）へのコピー送信処理
+      try {
+        const publicMemoRef = doc(db, 'publicMemos', stream.id);
+        if (isPublic && hasText) {
+          await setDoc(publicMemoRef, {
+            memos: {
+              [currentUser.uid]: {
+                memo: localMemo,
+                visibility: visibility,
+                updatedAt: new Date().toISOString(),
+                userName: currentUser.displayName || '名無しユーザー'
+              }
+            }
+          }, { merge: true });
+        } else {
+          await updateDoc(publicMemoRef, {
+            [`memos.${currentUser.uid}`]: deleteField()
+          }).catch(() => {});
+        }
+      } catch (publicError) {
+        console.error("公開メモの同期に失敗しました", publicError);
+      }
+
       setSaveStatus("success");
-      
       refetchMemos(); 
       setTimeout(() => setSaveStatus("idle"), 2000);
     } catch (error) {
@@ -341,7 +342,7 @@ export const StreamDetailModal = ({ stream, record, onClose, onUpdateRecord, isR
                     ) : publicMemos.length > 0 ? (
                       <div className="flex flex-col gap-3">
                         {publicMemos.map((m, index) => (
-                          <div key={`${m.id}-${index}`} className="bg-gray-50 p-3 rounded-lg border border-gray-100">
+                          <div key={`${m.userId}-${index}`} className="bg-gray-50 p-3 rounded-lg border border-gray-100">
                             <div className="flex items-center gap-2 mb-1.5">
                               <span className="text-xs font-bold text-gray-700">
                                 {m.visibility === 'public_named' ? (m.userName || '名無し') : '匿名ユーザー'}

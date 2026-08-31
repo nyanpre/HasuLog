@@ -1,11 +1,10 @@
 // src/hooks/usePublicMemos.ts
 import { useState, useEffect, useCallback } from 'react';
-import { collectionGroup, query, where, getDocs } from 'firebase/firestore';
+import { doc, getDoc } from 'firebase/firestore'; 
 import { db } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
 
 export type PublicMemo = {
-  id: string;
   userId: string;
   memo: string;
   visibility: 'public_anonymous' | 'public_named';
@@ -14,19 +13,18 @@ export type PublicMemo = {
 };
 
 const memoCache = new Map<string, { data: PublicMemo[], timestamp: number }>();
-const CACHE_DURATION = 5 * 60 * 1000; // 5分
+const CACHE_DURATION = 5 * 60 * 1000; 
 
 export const usePublicMemos = (streamId: string | undefined) => {
   const [memos, setMemos] = useState<PublicMemo[]>([]);
   const [loading, setLoading] = useState(false);
-  const [refreshCount, setRefreshCount] = useState(0); // 🌟 追加: 再取得用トリガー
+  const [refreshCount, setRefreshCount] = useState(0); 
   const { currentUser } = useAuth();
 
-  // 🌟 追加: キャッシュを破棄して強制的に再取得する関数
   const refetch = useCallback(() => {
     if (streamId) {
-      memoCache.delete(streamId); // この動画のキャッシュを消去
-      setRefreshCount((prev) => prev + 1); // useEffectを再実行させる
+      memoCache.delete(streamId); 
+      setRefreshCount((prev) => prev + 1); 
     }
   }, [streamId]);
 
@@ -45,30 +43,23 @@ export const usePublicMemos = (streamId: string | undefined) => {
 
       setLoading(true);
       try {
-        const memosQuery = query(
-          collectionGroup(db, 'watchHistory'),
-          where('streamId', '==', streamId),
-          where('memoVisibility', 'in', ['public_anonymous', 'public_named'])
-        );
+        const docRef = doc(db, 'publicMemos', streamId);
+        const docSnap = await getDoc(docRef);
 
-        const snapshot = await getDocs(memosQuery);
-        const fetchedMemos: PublicMemo[] = [];
+        let fetchedMemos: PublicMemo[] = [];
 
-        snapshot.forEach((doc) => {
-          const data = doc.data();
-          const userId = doc.ref.parent.parent?.id || 'unknown';
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          if (data.memos) {
+            fetchedMemos = Object.entries(data.memos).map(([userId, memoData]: [string, any]) => ({
+              userId,
+              ...memoData
+            }));
+          }
+        }
 
-          if (!data.memo || data.memo.trim() === '') return;
-
-          fetchedMemos.push({
-            id: doc.id,
-            userId,
-            memo: data.memo,
-            visibility: data.memoVisibility,
-            updatedAt: data.updatedAt,
-            userName: data.userName,
-          });
-        });
+        // 🌟 修正: 自分のメモを除外するフィルターを削除しました！
+        // これにより、自分が書いたメモも「みんなのメモ」一覧に表示され、公開されたか確認できるようになります。
 
         fetchedMemos.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
         
@@ -82,7 +73,7 @@ export const usePublicMemos = (streamId: string | undefined) => {
     };
 
     fetchMemos();
-  }, [streamId, currentUser?.uid, refreshCount]); // 🌟 refreshCountを追加
+  }, [streamId, currentUser?.uid, refreshCount]);
 
-  return { memos, loading, refetch }; // 🌟 refetchを外で使えるように返す
+  return { memos, loading, refetch }; 
 };
