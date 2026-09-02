@@ -1,7 +1,6 @@
 // src/components/common/Layout.tsx
 import { useState, type ReactNode } from "react";
 import { Outlet, Link } from "react-router-dom";
-// 🌟 修正: Archive アイコンを追加インポート
 import { Home, History, Clock, User, Star, Archive } from "lucide-react"; 
 import { HowToUseModal } from "./HowToUseModal";
 
@@ -31,36 +30,36 @@ export default function Layout({ children }: LayoutProps) {
       </main>
 
       <nav className="bg-white border-t fixed bottom-0 w-full pb-safe-bottom z-10">
-        <div className="flex justify-around items-center h-[72px] pb-2">
-          <Link to="/" className="flex flex-col items-center text-gray-500 hover:text-pink-500 transition-colors">
-            <Home size={24} />
-            <span className="text-[10px] mt-1">ホーム</span>
+        {/* 🌟 flex-1 で全アイテムの横幅を均一化し、左右端は余計に広げない設定 */}
+        <div className="flex items-center h-[72px] pb-2 w-full px-1">
+          <Link to="/" className="flex-1 min-w-0 flex flex-col items-center justify-center text-gray-500 hover:text-pink-500 transition-colors">
+            <Home size={22} />
+            <span className="text-[10px] mt-1 truncate">ホーム</span>
           </Link>
 
-          <Link to="/recommendation" className="flex flex-col items-center text-gray-500 hover:text-pink-500 transition-colors">
-            <Star size={24} />
-            <span className="text-[10px] mt-1">おすすめ</span>
+          <Link to="/recommendation" className="flex-1 min-w-0 flex flex-col items-center justify-center text-gray-500 hover:text-pink-500 transition-colors">
+            <Star size={22} />
+            <span className="text-[10px] mt-1 truncate">おすすめ</span>
           </Link>
 
-          {/* 🌟 追加: 「関連」ページへのリンク */}
-          <Link to="/related" className="flex flex-col items-center text-gray-500 hover:text-pink-500 transition-colors">
-            <Archive size={24} />
-            <span className="text-[10px] mt-1">関連</span>
+          <Link to="/related" className="flex-1 min-w-0 flex flex-col items-center justify-center text-gray-500 hover:text-pink-500 transition-colors">
+            <Archive size={22} />
+            <span className="text-[10px] mt-1 truncate">関連</span>
           </Link>
 
-          <Link to="/history" className="flex flex-col items-center text-gray-500 hover:text-pink-500 transition-colors">
-            <History size={24} />
-            <span className="text-[10px] mt-1">履歴</span>
+          <Link to="/history" className="flex-1 min-w-0 flex flex-col items-center justify-center text-gray-500 hover:text-pink-500 transition-colors">
+            <History size={22} />
+            <span className="text-[10px] mt-1 truncate">履歴</span>
           </Link>
           
-          <Link to="/timeline" className="flex flex-col items-center text-gray-500 hover:text-pink-500 transition-colors">
-            <Clock size={24} />
-            <span className="text-[10px] mt-1">タイムライン</span>
+          <Link to="/timeline" className="flex-1 min-w-0 flex flex-col items-center justify-center text-gray-500 hover:text-pink-500 transition-colors">
+            <Clock size={22} />
+            <span className="text-[10px] mt-1 truncate">タイムライン</span>
           </Link>
           
-          <Link to="/profile" className="flex flex-col items-center text-gray-500 hover:text-pink-500 transition-colors">
-            <User size={24} />
-            <span className="text-[10px] mt-1">マイページ</span>
+          <Link to="/profile" className="flex-1 min-w-0 flex flex-col items-center justify-center text-gray-500 hover:text-pink-500 transition-colors">
+            <User size={22} />
+            <span className="text-[10px] mt-1 truncate">マイページ</span>
           </Link>
         </div>
       </nav>

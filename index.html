@@ -3,8 +3,13 @@
   <head>
     <meta charset="UTF-8" />
     
-    <!-- 🌟 ファビコンの設定（PNG画像を指定） -->
-    <link rel="icon" type="image/png" href="/favicon.png" />
+    <!-- 🌟 キャッシュ無効化（常に最新の index.html を取得させる） -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
+    
+    <!-- 🌟 ファビコンの設定（Base URL 対策のため相対パス指定） -->
+    <link rel="icon" type="image/png" href="./favicon.png" />
     
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>HasuLog</title>
