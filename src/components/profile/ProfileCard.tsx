@@ -2,7 +2,6 @@
 import { useState, useEffect } from 'react';
 import { Edit2, Check, X, LogOut, Heart, Upload } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
-// 🌟 追加: フォロー数・フォロワー数を取得するためのフック
 import { useFriends } from '../../hooks/useFriends';
 import type { UserProfileData } from '../../types';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
@@ -13,19 +12,28 @@ const MEMBERS = [
   "藤島 慈", "百生 吟子", "徒町 小鈴", "安養寺 姫芽", "セラス 柳田 リリエンフェルト", "桂城 泉"
 ];
 
-const recordOptions = ["未設定", "103期 第1話 (仮)", "104期 第1話 (仮)"];
-const fesLiveOptions = ["未設定", "103期 4月度Fes×LIVE (仮)"];
+// 🌟 削除: ここにあった const recordOptions = [...] と const fesLiveOptions = [...] は不要になります。
 
 interface ProfileCardProps {
   profileData: UserProfileData;
   meetsOptions: string[];
+  // 🌟 追加: 親から受け取る配列を型定義
+  recordOptions: string[];
+  fesLiveOptions: string[];
   onSave: (newName: string, newProfileData: UserProfileData, newPhotoUrl?: string) => Promise<void>;
   onLogout: () => Promise<void>;
 }
 
-export default function ProfileCard({ profileData, meetsOptions, onSave, onLogout }: ProfileCardProps) {
+export default function ProfileCard({ 
+  profileData, 
+  meetsOptions, 
+  recordOptions, // 🌟 追加: Propsから受け取る
+  fesLiveOptions, // 🌟 追加: Propsから受け取る
+  onSave, 
+  onLogout 
+}: ProfileCardProps) {
+  
   const { currentUser } = useAuth();
-  // 🌟 追加: フックからフォローリストとフォロワーリストを取得
   const { friends, followers } = useFriends();
   
   const [isEditingProfile, setIsEditingProfile] = useState(false);
@@ -85,7 +93,6 @@ export default function ProfileCard({ profileData, meetsOptions, onSave, onLogou
     setIsEditingOshi(false);
   };
 
-  // 🌟 追加: タップ時にフレンドリストへスクロールする補助関数
   const scrollToFriendList = () => {
     const listElement = document.getElementById('friend-list-section');
     if (listElement) listElement.scrollIntoView({ behavior: 'smooth' });
@@ -93,7 +100,7 @@ export default function ProfileCard({ profileData, meetsOptions, onSave, onLogou
 
   return (
     <div className="bg-white rounded-xl shadow-sm p-5 mb-5">
-      {/* ユーザー情報 */}
+      {/* ユーザー情報 (変更なし) */}
       <div className="flex items-center space-x-4 mb-5">
         <div className="w-16 h-16 bg-pink-100 rounded-full flex items-center justify-center text-pink-600 font-bold text-2xl shadow-inner overflow-hidden flex-shrink-0 relative group">
           {currentUser?.photoURL || editPhotoUrl ? (
@@ -166,7 +173,6 @@ export default function ProfileCard({ profileData, meetsOptions, onSave, onLogou
                 </button>
               </div>
               
-              {/* 🌟 追加: フォロー・フォロワー数表示（タップ可能） */}
               <div className="flex gap-4 mt-2">
                 <button onClick={scrollToFriendList} className="text-xs sm:text-sm text-gray-600 hover:text-pink-600 transition-colors">
                   <span className="font-bold text-gray-900">{friends?.length || 0}</span> フォロー
@@ -195,7 +201,7 @@ export default function ProfileCard({ profileData, meetsOptions, onSave, onLogou
               </select>
             </div>
             <div>
-              <label className="block text-xs font-bold text-gray-500 mb-1">推しWith×MEETS (STATION含む)</label>
+              <label className="block text-xs font-bold text-gray-500 mb-1">推しWith×MEETS</label>
               <input
                 type="text"
                 list="meets-list"
@@ -219,6 +225,7 @@ export default function ProfileCard({ profileData, meetsOptions, onSave, onLogou
                 className="w-full border border-gray-300 rounded-md p-2 text-sm text-gray-700 bg-white focus:outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-500"
               />
               <datalist id="record-list">
+                {/* 🌟 修正: 親から受け取った recordOptions をマップ */}
                 {recordOptions.map(option => <option key={option} value={option} />)}
               </datalist>
             </div>
@@ -233,6 +240,7 @@ export default function ProfileCard({ profileData, meetsOptions, onSave, onLogou
                 className="w-full border border-gray-300 rounded-md p-2 text-sm text-gray-700 bg-white focus:outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-500"
               />
               <datalist id="feslive-list">
+                {/* 🌟 修正: 親から受け取った fesLiveOptions をマップ */}
                 {fesLiveOptions.map(option => <option key={option} value={option} />)}
               </datalist>
             </div>

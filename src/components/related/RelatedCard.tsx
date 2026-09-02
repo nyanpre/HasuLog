@@ -15,14 +15,12 @@ export const RelatedCard = ({ item, onSelectContent }: Props) => {
           <span className="inline-block px-2 py-0.5 bg-gray-100 text-gray-600 text-[11px] font-bold rounded">
             {item.category}
           </span>
-          {/* 🌟 媒体名が存在する場合はバッジ表示 */}
           {item.source && (
             <span className="inline-block px-2 py-0.5 bg-pink-50 text-pink-600 border border-pink-100 text-[11px] font-bold rounded">
               {item.source}
             </span>
           )}
         </div>
-        {/* 🌟 スマホ時のサイズを text-base に拡大、PC時は sm:text-lg */}
         <h3 className="text-base sm:text-lg font-bold text-gray-800 leading-snug group-hover:text-pink-600 transition-colors break-words">
           {item.title}
         </h3>
@@ -32,8 +30,10 @@ export const RelatedCard = ({ item, onSelectContent }: Props) => {
         {item.description}
       </p>
       
-      <div className="text-[11px] text-gray-400 font-medium mb-3">
-        公開日: {item.publishedDate}
+      {/* 🌟 「公開日:」の表記を残し、ラベル・日付ともに黒寄り(text-gray-700)へ統一 */}
+      <div className="text-xs text-gray-700 font-medium mb-3 flex items-center gap-1">
+        <span>公開日:</span>
+        <span className="font-semibold">{item.publishedDate}</span>
       </div>
 
       {/* 単発コンテンツボタン */}
@@ -43,7 +43,7 @@ export const RelatedCard = ({ item, onSelectContent }: Props) => {
           className="w-full mt-auto flex items-center justify-between px-3 py-2.5 bg-pink-50 hover:bg-pink-100 text-pink-600 text-xs sm:text-sm font-bold rounded-lg transition-colors border border-pink-100 min-w-0"
         >
           <span className="flex items-center gap-1.5 min-w-0 flex-1 text-left">
-            <FileText size={16} className="flex-shrink-0" /> 
+            <FileText size={16} className="flex-shrink-0" />
             <span className="truncate">閲覧する</span>
           </span>
           <ChevronRight size={16} className="flex-shrink-0 ml-2" />
@@ -60,7 +60,7 @@ export const RelatedCard = ({ item, onSelectContent }: Props) => {
               className="w-full flex items-center justify-between px-3 py-2 bg-gray-50 hover:bg-pink-50 text-gray-700 hover:text-pink-600 text-xs sm:text-sm font-bold rounded-lg transition-colors border border-transparent hover:border-pink-100 min-w-0"
             >
               <span className="flex items-center gap-1.5 min-w-0 flex-1 text-left">
-                <FileText size={15} className="flex-shrink-0" /> 
+                <FileText size={15} className="flex-shrink-0" />
                 <span className="truncate">{part.label}</span>
               </span>
               <ChevronRight size={15} className="flex-shrink-0 opacity-50 ml-2" />

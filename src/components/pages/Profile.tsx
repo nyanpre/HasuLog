@@ -1,10 +1,11 @@
 // src/components/pages/Profile.tsx
 import { useState, useEffect } from 'react';
-import { User, LogOut } from 'lucide-react'; // 🌟 LogOutアイコンを追加
+import { User, LogOut } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { auth, db } from '../../firebase';
 import { signOut, updateProfile } from 'firebase/auth';
-import { collection, getDocs, doc, getDoc, setDoc } from 'firebase/firestore';
+// 🌟 collection, getDocs は不要になったためインポートから削除
+import { doc, getDoc, setDoc } from 'firebase/firestore'; 
 import type { UserProfileData } from '../../types';
 
 import ProfileCard from '../profile/ProfileCard';
@@ -13,10 +14,20 @@ import { RankCard } from '../profile/RankCard';
 import { PointDashboard } from '../profile/PointDashboard';
 import { FriendRankComparison } from '../profile/FriendRankComparison';
 
+// 🌟 追加: 4つの JSON データをすべてインポート
+import fesLiveRecords from '../../data/feslive_wiki_data.json';
+import activityRecords from '../../data/story_wiki_data.json';
+import withMeetsRecords from '../../data/withmeets_wiki_data.json';
+import withStationRecords from '../../data/withstation_wiki_data.json';
+
 export default function Profile() {
   const { currentUser } = useAuth();
   
+  // 選択肢を保持するステート
   const [meetsOptions, setMeetsOptions] = useState<string[]>(["未設定"]);
+  const [recordOptions, setRecordOptions] = useState<string[]>(["未設定"]);
+  const [fesLiveOptions, setFesLiveOptions] = useState<string[]>(["未設定"]);
+
   const [profileData, setProfileData] = useState<UserProfileData>({
     oshiMember: "未設定",
     oshiMeets: "未設定",
@@ -28,6 +39,37 @@ export default function Profile() {
 
   const isAnonymous = currentUser?.isAnonymous || false;
 
+  // 🌟 統合: JSONファイルからすべての選択肢リストを生成（Firebase通信なし）
+  useEffect(() => {
+    // 1. 活動記録のタイトル一覧を抽出
+    const records = activityRecords.map(item => {
+      const season = item.season || "";
+      const title = item.title || "";
+      if (title.includes(season)) {
+        return title;
+      }
+      return `${season} ${title}`.trim();
+    });
+    setRecordOptions(["未設定", ...new Set(records)]);
+
+    // 2. Fes×LIVEのタイトル一覧を抽出
+    const fesLives = fesLiveRecords.map(item => item.title || "");
+    setFesLiveOptions(["未設定", ...new Set(fesLives)]);
+
+    // 3. With×MEETS と みらくらぱーく！ラジオ(STATION) を結合して抽出
+    const allMeets = [...withMeetsRecords, ...withStationRecords];
+    const meetsList = allMeets
+      .map(item => {
+        if (!item.title) return null;
+        return item.date ? `${item.title} ${item.date}` : item.title;
+      })
+      .filter(Boolean) as string[];
+    
+    // 日付順やタイトル順など必要に応じて .sort() を挟むことも可能です
+    setMeetsOptions(["未設定", ...new Set(meetsList)]);
+  }, []);
+
+  // Firebase からユーザー自身のプロフィールだけを取得する
   useEffect(() => {
     const fetchUserProfile = async () => {
       if (currentUser) {
@@ -77,26 +119,6 @@ export default function Profile() {
     fetchUserProfile();
   }, [currentUser, isAnonymous]);
 
-  useEffect(() => {
-    const fetchMeetsTitles = async () => {
-      try {
-        const querySnapshot = await getDocs(collection(db, 'streams'));
-        const meetsList = querySnapshot.docs
-          .map(doc => {
-            const data = doc.data();
-            if (!data.title) return null;
-            return data.date ? `${data.title} ${data.date}` : data.title;
-          })
-          .filter(Boolean) as string[];
-        
-        setMeetsOptions(["未設定", ...new Set(meetsList)]);
-      } catch (error) {
-        console.error("With×MEETSデータ取得エラー:", error);
-      }
-    };
-    fetchMeetsTitles();
-  }, []);
-
   const handleSaveProfile = async (newName: string, newProfileData: UserProfileData, newPhotoUrl?: string) => {
     if (!currentUser || isAnonymous) return;
     
@@ -143,7 +165,6 @@ export default function Profile() {
         </h2>
       </div>
 
-      {/* 🌟 変更: ゲストユーザーには警告メッセージと専用のログアウトボタンを表示 */}
       {isAnonymous && (
         <div className="bg-gray-100 p-5 rounded-xl text-center text-sm text-gray-600 font-bold border border-gray-200 shadow-sm flex flex-col items-center gap-4">
           <p className="leading-relaxed">
@@ -160,11 +181,12 @@ export default function Profile() {
         </div>
       )}
 
-      {/* ゲストの時はProfileCard自体を触れないようにガード */}
       <div className={isAnonymous ? "opacity-60 pointer-events-none select-none" : ""}>
         <ProfileCard 
           profileData={profileData}
           meetsOptions={meetsOptions}
+          recordOptions={recordOptions}
+          fesLiveOptions={fesLiveOptions}
           onSave={handleSaveProfile}
           onLogout={handleLogout}
         />
@@ -172,7 +194,6 @@ export default function Profile() {
 
       <RankCard onOpenDashboard={() => setShowDashboard(true)} />
 
-      {/* ゲストの時はフレンド機能などを隠す（半透明にしてガード） */}
       <div className={`grid grid-cols-1 md:grid-cols-2 gap-6 items-start ${isAnonymous ? "opacity-60 pointer-events-none select-none" : ""}`}>
         <FriendRankComparison />
         <FriendList friendId={friendId} />
