@@ -1,7 +1,8 @@
 // src/components/common/Layout.tsx
 import { useState, type ReactNode } from "react";
 import { Outlet, Link } from "react-router-dom";
-import { Home, History, Clock, User, Star, Archive } from "lucide-react"; 
+// 🌟 修正: Clock を Rows3 (スレッド/行が流れるアイコン) に変更
+import { Home, History, Rows3, User, Star, Archive } from "lucide-react"; 
 import { HowToUseModal } from "./HowToUseModal";
 
 interface LayoutProps {
@@ -30,36 +31,37 @@ export default function Layout({ children }: LayoutProps) {
       </main>
 
       <nav className="bg-white border-t fixed bottom-0 w-full pb-safe-bottom z-10">
-        {/* 🌟 flex-1 で全アイテムの横幅を均一化し、左右端は余計に広げない設定 */}
-        <div className="flex items-center h-[72px] pb-2 w-full px-1">
-          <Link to="/" className="flex-1 min-w-0 flex flex-col items-center justify-center text-gray-500 hover:text-pink-500 transition-colors">
+        {/* 🌟 px-[14px] で左右 padding を正確に 14px に指定 */}
+        <div className="flex justify-between items-center h-[72px] pb-2 w-full px-[14px]">
+          <Link to="/" className="flex-shrink-0 flex flex-col items-center justify-center text-gray-500 hover:text-pink-500 transition-colors">
             <Home size={22} />
-            <span className="text-[10px] mt-1 truncate">ホーム</span>
+            <span className="text-[10px] mt-1 whitespace-nowrap">ホーム</span>
           </Link>
 
-          <Link to="/recommendation" className="flex-1 min-w-0 flex flex-col items-center justify-center text-gray-500 hover:text-pink-500 transition-colors">
+          <Link to="/recommendation" className="flex-shrink-0 flex flex-col items-center justify-center text-gray-500 hover:text-pink-500 transition-colors">
             <Star size={22} />
-            <span className="text-[10px] mt-1 truncate">おすすめ</span>
+            <span className="text-[10px] mt-1 whitespace-nowrap">おすすめ</span>
           </Link>
 
-          <Link to="/related" className="flex-1 min-w-0 flex flex-col items-center justify-center text-gray-500 hover:text-pink-500 transition-colors">
+          <Link to="/related" className="flex-shrink-0 flex flex-col items-center justify-center text-gray-500 hover:text-pink-500 transition-colors">
             <Archive size={22} />
-            <span className="text-[10px] mt-1 truncate">関連</span>
+            <span className="text-[10px] mt-1 whitespace-nowrap">関連</span>
           </Link>
 
-          <Link to="/history" className="flex-1 min-w-0 flex flex-col items-center justify-center text-gray-500 hover:text-pink-500 transition-colors">
+          <Link to="/history" className="flex-shrink-0 flex flex-col items-center justify-center text-gray-500 hover:text-pink-500 transition-colors">
             <History size={22} />
-            <span className="text-[10px] mt-1 truncate">履歴</span>
+            <span className="text-[10px] mt-1 whitespace-nowrap">履歴</span>
           </Link>
           
-          <Link to="/timeline" className="flex-1 min-w-0 flex flex-col items-center justify-center text-gray-500 hover:text-pink-500 transition-colors">
-            <Clock size={22} />
-            <span className="text-[10px] mt-1 truncate">タイムライン</span>
+          {/* 🌟 -mx-1.5 で文字幅による間隔の広がりを約10%相殺 */}
+          <Link to="/timeline" className="flex-shrink-0 -mx-1.5 flex flex-col items-center justify-center text-gray-500 hover:text-pink-500 transition-colors">
+            <Rows3 size={22} />
+            <span className="text-[10px] mt-1 whitespace-nowrap">タイムライン</span>
           </Link>
           
-          <Link to="/profile" className="flex-1 min-w-0 flex flex-col items-center justify-center text-gray-500 hover:text-pink-500 transition-colors">
+          <Link to="/profile" className="flex-shrink-0 flex flex-col items-center justify-center text-gray-500 hover:text-pink-500 transition-colors">
             <User size={22} />
-            <span className="text-[10px] mt-1 truncate">マイページ</span>
+            <span className="text-[10px] mt-1 whitespace-nowrap">マイページ</span>
           </Link>
         </div>
       </nav>
