@@ -1,5 +1,5 @@
 // src/App.tsx
-import { signInWithPopup, GoogleAuthProvider, signInAnonymously } from 'firebase/auth'; // 🌟 signInAnonymouslyを追加
+import { signInWithPopup, GoogleAuthProvider, signInAnonymously } from 'firebase/auth';
 import { auth } from './firebase';
 import { useAuth } from './contexts/AuthContext';
 import { Routes, Route, Navigate } from 'react-router-dom';
@@ -13,6 +13,8 @@ import Profile from './components/pages/Profile';
 import { History } from './components/pages/History';
 import Timeline from './components/pages/Timeline';
 import Recommendation from './components/pages/Recommendation';
+// 🌟 追加: 新しく作るRelatedコンポーネントをインポート
+import Related from './components/pages/Related'; 
 
 export default function App() {
   const { currentUser, loading } = useAuth();
@@ -26,7 +28,6 @@ export default function App() {
     }
   };
 
-  // 🌟 追加: ゲストログイン処理
   const handleGuestLogin = async () => {
     try {
       await signInAnonymously(auth);
@@ -54,7 +55,9 @@ export default function App() {
               <Route path="/history" element={<History />} />
               <Route path="/profile" element={<Profile />} />
               <Route path="/timeline" element={<Timeline />} />
-              <Route path="recommendation" element={<Recommendation />} />
+              <Route path="/recommendation" element={<Recommendation />} />
+              {/* 🌟 追加: /related へのルーティング */}
+              <Route path="/related" element={<Related />} />
               
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
@@ -79,7 +82,6 @@ export default function App() {
           Googleでログイン
         </button>
         
-        {/* 🌟 追加: ゲストログインボタン */}
         <button 
           onClick={handleGuestLogin}
           className="w-full bg-gray-100 hover:bg-gray-200 text-gray-600 font-bold py-2 px-4 rounded transition duration-200 text-sm"
