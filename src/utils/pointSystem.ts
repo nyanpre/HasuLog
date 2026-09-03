@@ -27,7 +27,11 @@ export const addWatchRecord = async (
 ) => {
   if (!userId || !streamId) return;
 
-  const earnedPoints = getStreamPoints(streamType, isRecommended);
+  // 🌟 ベースポイントとボーナスを分離して計算
+  const basePoints = getStreamPoints(streamType, false);
+  const bonusPoints = isRecommended ? (getStreamPoints(streamType, true) - basePoints) : 0;
+  const earnedPoints = basePoints + bonusPoints;
+
   const actionMessage = isRecommended 
     ? `【今日のおすすめ】「${streamTitle}」を視聴して ${earnedPoints}pt 獲得しました！` 
     : `「${streamTitle}」を視聴して ${earnedPoints}pt 獲得しました！`;
@@ -50,22 +54,30 @@ export const addWatchRecord = async (
     }
   }
 
-  // 🌟 新仕様: pointsBreakdown（月別内訳）を一緒に記録する
+  // 🌟 内訳を正しく分けて加算する
   if (!userSnap.exists() || isNewMonth) {
-    await setDoc(userRef, {
+    const newData: any = {
       monthlyPoints: earnedPoints,
       totalPoints: increment(earnedPoints),
       lastResetMonth: currentMonth,
-      [`pointsBreakdown.${currentMonth}.${streamType}`]: increment(earnedPoints),
+      [`pointsBreakdown.${currentMonth}.${streamType}`]: basePoints,
       updatedAt: serverTimestamp()
-    }, { merge: true });
+    };
+    if (bonusPoints > 0) {
+      newData[`pointsBreakdown.${currentMonth}.recommended_bonus`] = bonusPoints;
+    }
+    await setDoc(userRef, newData, { merge: true });
   } else {
-    await updateDoc(userRef, {
+    const updateData: any = {
       monthlyPoints: increment(earnedPoints),
       totalPoints: increment(earnedPoints),
-      [`pointsBreakdown.${currentMonth}.${streamType}`]: increment(earnedPoints),
+      [`pointsBreakdown.${currentMonth}.${streamType}`]: increment(basePoints),
       updatedAt: serverTimestamp()
-    });
+    };
+    if (bonusPoints > 0) {
+      updateData[`pointsBreakdown.${currentMonth}.recommended_bonus`] = increment(bonusPoints);
+    }
+    await updateDoc(userRef, updateData);
   }
 
   const recordSnap = await getDoc(recordRef);
@@ -104,28 +116,44 @@ export const removeWatchRecord = async (
   userId: string, 
   streamId: string, 
   streamTitle: string,
-  streamType: string = "with_meets"
+  streamType: string = "with_meets",
+  isRecommended?: boolean 
 ) => {
   if (!userId || !streamId) return;
 
-  const deductPoints = getStreamPoints(streamType, false);
+  const recordRef = doc(db, `users/${userId}/watchHistory`, streamId);
+  const recordSnap = await getDoc(recordRef);
+  
+  // 🌟 履歴データから「おすすめ視聴」として加算されたものか判定する
+  let recommendedFlag = isRecommended;
+  if (recommendedFlag === undefined && recordSnap.exists()) {
+    recommendedFlag = recordSnap.data().lastAction === 'recommended_watch';
+  }
+
+  const basePoints = getStreamPoints(streamType, false);
+  const bonusPoints = recommendedFlag ? (getStreamPoints(streamType, true) - basePoints) : 0;
+  const deductPoints = basePoints + bonusPoints;
+
   const now = new Date();
   const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 
   const userRef = doc(db, "users", userId);
-  const recordRef = doc(db, `users/${userId}/watchHistory`, streamId);
 
   const userSnap = await getDoc(userRef);
   if (userSnap.exists()) {
-    await updateDoc(userRef, {
+    // 🌟 減算時もベースとボーナスを正しく分けて引く
+    const updateData: any = {
       monthlyPoints: increment(-deductPoints),
       totalPoints: increment(-deductPoints),
-      [`pointsBreakdown.${currentMonth}.${streamType}`]: increment(-deductPoints),
+      [`pointsBreakdown.${currentMonth}.${streamType}`]: increment(-basePoints),
       updatedAt: serverTimestamp()
-    });
+    };
+    if (bonusPoints > 0) {
+      updateData[`pointsBreakdown.${currentMonth}.recommended_bonus`] = increment(-bonusPoints);
+    }
+    await updateDoc(userRef, updateData);
   }
 
-  const recordSnap = await getDoc(recordRef);
   if (recordSnap.exists()) {
     const currentCount = recordSnap.data().viewCount || 0;
     if (currentCount > 0) {
