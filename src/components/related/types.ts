@@ -10,6 +10,7 @@ export interface ContentPart {
 export interface ContentItem {
   id: string;
   originalUrl?: string;
+  thumbnailUrl?: string;
   title: string;
   source?: string;       // 🌟 媒体名（Febri, リスアニ！など）
   description: string;

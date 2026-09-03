@@ -9,7 +9,7 @@ type Props = {
 export const RelatedViewerModal = ({ content, onClose }: Props) => {
   if (!content) return null;
 
-  // 🌟 ViteのBase設定（/HasuLog/ など）を自動で補完する関数
+  // ViteのBase設定（/HasuLog/ など）を自動で補完する関数
   const getActualUrl = (path: string) => {
     if (path.startsWith('/')) {
       const baseUrl = import.meta.env.BASE_URL; // 例: "/" や "/HasuLog/"
@@ -36,12 +36,12 @@ export const RelatedViewerModal = ({ content, onClose }: Props) => {
       
       <div className="flex-1 bg-gray-100 w-full h-full relative flex items-center justify-center">
         <span className="absolute text-gray-400 text-xs font-bold">読み込み中...</span>
-        {/* 🌟 補完したURLを src に渡す */}
+        {/* 🌟 sandbox に allow-forms を追加 */}
         <iframe 
           src={getActualUrl(content.url)} 
           title="関連コンテンツ"
           className="w-full h-full border-none absolute inset-0 bg-white z-10"
-          sandbox="allow-same-origin allow-scripts allow-popups"
+          sandbox="allow-same-origin allow-scripts allow-popups allow-forms"
         />
       </div>
     </div>

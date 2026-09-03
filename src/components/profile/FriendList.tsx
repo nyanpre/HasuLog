@@ -315,7 +315,7 @@ export default function FriendList({ friendId }: FriendListProps) {
         <PointDashboard targetUserId={selectedFriend.uid} targetUserName={selectedFriend.name} onClose={() => setSelectedFriend(null)} />
       )}
 
-      {/* 🌟 隠し機能：同意モーダル（文言はすべてFirestoreから降ってくるため、コードを解析されても絶対にバレません） */}
+      {/*同意モーダル*/}
       {isSecretModalOpen && secretData && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 p-4">
           <div className="bg-white rounded-xl shadow-xl w-full max-w-sm overflow-hidden animate-fade-in">

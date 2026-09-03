@@ -1,8 +1,11 @@
 // src/components/common/Layout.tsx
-import { useState, type ReactNode } from "react";
+import { useState, useEffect, type ReactNode } from "react";
 import { Outlet, Link } from "react-router-dom";
 import { Home, History, Rows3, User, Star, Archive } from "lucide-react"; 
 import { HowToUseModal } from "./HowToUseModal";
+import { useAuth } from "../../contexts/AuthContext";
+import { doc, getDoc } from "firebase/firestore";
+import { db } from "../../firebase";
 
 interface LayoutProps {
   children?: ReactNode;
@@ -10,6 +13,37 @@ interface LayoutProps {
 
 export default function Layout({ children }: LayoutProps) {
   const [isHelpModalOpen, setIsHelpModalOpen] = useState(false);
+  const { currentUser } = useAuth();
+  const [isExMode, setIsExMode] = useState(false);
+
+  useEffect(() => {
+    const checkExMode = async () => {
+      if (!currentUser || currentUser.isAnonymous) {
+        setIsExMode(false);
+        return;
+      }
+
+      // セッションストレージを確認して無駄なFirestore読み取りを抑制
+      const cached = sessionStorage.getItem(`exMode_${currentUser.uid}`);
+      if (cached !== null) {
+        setIsExMode(cached === 'true');
+        return;
+      }
+
+      try {
+        const userDoc = await getDoc(doc(db, "users", currentUser.uid));
+        if (userDoc.exists()) {
+          const enabled = !!userDoc.data().exMode;
+          setIsExMode(enabled);
+          sessionStorage.setItem(`exMode_${currentUser.uid}`, String(enabled));
+        }
+      } catch (error) {
+        console.error("exMode取得エラー:", error);
+      }
+    };
+
+    checkExMode();
+  }, [currentUser]);
 
   return (
     <div className="flex flex-col min-h-screen bg-gray-50">
@@ -30,8 +64,8 @@ export default function Layout({ children }: LayoutProps) {
       </main>
 
       <nav className="bg-white border-t fixed bottom-0 w-full pb-safe-bottom z-10">
-        {/* 🌟 grid grid-cols-6 で領域を6等分し、アイコンの中心点間距離を完全に均一化 */}
-        <div className="grid grid-cols-6 items-center h-[72px] pb-2 w-full px-[14px]">
+        {/* 🌟 isExMode に応じて grid-cols-5 と grid-cols-6 を切り替え、等間隔を維持 */}
+        <div className={`grid ${isExMode ? 'grid-cols-6' : 'grid-cols-5'} items-center h-[72px] pb-2 w-full px-[14px]`}>
           <Link to="/" className="flex flex-col items-center justify-center text-gray-500 hover:text-pink-500 transition-colors min-w-0">
             <Home size={22} className="flex-shrink-0" />
             <span className="text-[10px] mt-1 truncate">ホーム</span>
@@ -42,10 +76,13 @@ export default function Layout({ children }: LayoutProps) {
             <span className="text-[10px] mt-1 truncate">おすすめ</span>
           </Link>
 
-          <Link to="/related" className="flex-col items-center justify-center text-gray-500 hover:text-pink-500 transition-colors min-w-0 flex">
-            <Archive size={22} className="flex-shrink-0" />
-            <span className="text-[10px] mt-1 truncate">関連</span>
-          </Link>
+          {/* 🌟 認証ユーザー(exMode)のみ表示 */}
+          {isExMode && (
+            <Link to="/related" className="flex flex-col items-center justify-center text-gray-500 hover:text-pink-500 transition-colors min-w-0">
+              <Archive size={22} className="flex-shrink-0" />
+              <span className="text-[10px] mt-1 truncate">関連</span>
+            </Link>
+          )}
 
           <Link to="/history" className="flex flex-col items-center justify-center text-gray-500 hover:text-pink-500 transition-colors min-w-0">
             <History size={22} className="flex-shrink-0" />

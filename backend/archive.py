@@ -14,12 +14,44 @@ def get_chromium_path():
         return sorted(matches)[-1]
     return None
 
-def archive_page(url: str, output_filename: str):
+def extract_meta(output_path):
+    title = "タイトルを取得できませんでした"
+    description = "ここに説明を入力"
+    try:
+        with open(output_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+            
+            # <title>の抽出
+            t_match = re.search(r'<title[^>]*>(.*?)</title>', content, re.IGNORECASE | re.DOTALL)
+            if t_match:
+                title = t_match.group(1).strip()
+            
+            # description または og:description の抽出
+            d_match = re.search(r'<meta[^>]*name=["\']description["\'][^>]*content=["\'](.*?)["\']', content, re.IGNORECASE)
+            if not d_match:
+                d_match = re.search(r'<meta[^>]*content=["\'](.*?)["\'][^>]*name=["\']description["\']', content, re.IGNORECASE)
+            if not d_match:
+                d_match = re.search(r'<meta[^>]*property=["\']og:description["\'][^>]*content=["\'](.*?)["\']', content, re.IGNORECASE)
+            if not d_match:
+                d_match = re.search(r'<meta[^>]*content=["\'](.*?)["\'][^>]*property=["\']og:description["\']', content, re.IGNORECASE)
+                
+            if d_match:
+                description = d_match.group(1).strip()
+                
+    except Exception:
+        pass
+    return title, description
+
+def archive_page(article_id: str, url: str):
     base_dir = os.path.dirname(os.path.abspath(__file__))
     project_root = os.path.dirname(base_dir)
     target_dir = os.path.join(project_root, "public", "archives")
     
     os.makedirs(target_dir, exist_ok=True)
+    
+    # .html 拡張子の自動補正
+    clean_id = article_id.replace(".html", "")
+    output_filename = f"{clean_id}.html"
     output_path = os.path.join(target_dir, output_filename)
 
     browser_path = get_chromium_path()
@@ -27,7 +59,7 @@ def archive_page(url: str, output_filename: str):
         print("❌ Playwright 版 Chromium が見つかりません。")
         sys.exit(1)
     
-    print(f"🔄 アーカイブを開始します...")
+    print(f"🔄 アーカイブを開始します (ID: {clean_id})")
     print(f"URL: {url}")
     print(f"出力先: {output_path}")
 
@@ -48,23 +80,13 @@ def archive_page(url: str, output_filename: str):
 
     print("\n✅ アーカイブ成功！HTMLを保存しました。")
     
-    # --- タイトルの抽出 ---
-    page_title = "タイトルを取得できませんでした"
-    try:
-        with open(output_path, 'r', encoding='utf-8') as f:
-            content = f.read()
-            match = re.search(r'<title[^>]*>(.*?)</title>', content, re.IGNORECASE | re.DOTALL)
-            if match:
-                page_title = match.group(1).strip()
-    except Exception:
-        pass
+    # HTMLからタイトルと説明を自動抽出
+    title, desc = extract_meta(output_path)
 
     # --- JSONへの自動追記・更新処理 ---
     json_path = os.path.join(project_root, "src", "components", "related", "data", "articles.json")
-    new_article_id = output_filename.replace(".html", "")
     today = datetime.now().strftime("%Y-%m-%d")
     
-    # 既存データの読み込み
     articles = []
     if os.path.exists(json_path):
         try:
@@ -75,31 +97,30 @@ def archive_page(url: str, output_filename: str):
 
     updated = False
     for article in articles:
-        # 🌟 元のURL (originalUrl) をキーにして既存データか判定
-        if article.get("originalUrl") == url:
-            # 既存データの場合は、タイトルとHTMLへのパスのみ最新化する
-            # （手入力した description や category、固有の id, publishedDate は維持）
-            article["title"] = page_title
+        # ID または元のURLで既存データを判定
+        if article.get("id") == clean_id or article.get("originalUrl") == url:
+            article["id"] = clean_id
+            article["title"] = title
             article["contentUrl"] = f"/archives/{output_filename}"
+            if article.get("description") == "ここに説明を入力" or not article.get("description"):
+                article["description"] = desc
             updated = True
-            print(f"🔄 既存の記事データを更新しました (ID: {article.get('id')})")
+            print(f"🔄 既存の記事データを更新しました (ID: {clean_id})")
             break
             
     if not updated:
-        # 🌟 存在しない場合は新規作成
         new_article = {
-            "id": new_article_id,       # 固有ID（ファイル名をベースに生成）
-            "originalUrl": url,         # 元のURL（今後の更新キー）
-            "title": page_title,
-            "description": "ここに説明を入力",
+            "id": clean_id,
+            "originalUrl": url,
+            "title": title,
+            "description": desc,
             "publishedDate": today,
             "category": "メディア",
             "contentUrl": f"/archives/{output_filename}"
         }
         articles.append(new_article)
-        print(f"✨ 新規記事データを追加しました (ID: {new_article_id})")
+        print(f"✨ 新規記事データを追加しました (ID: {clean_id})")
 
-    # JSONファイルへ書き出し
     try:
         with open(json_path, 'w', encoding='utf-8') as f:
             json.dump(articles, f, ensure_ascii=False, indent=2)
@@ -109,7 +130,18 @@ def archive_page(url: str, output_filename: str):
 
 if __name__ == "__main__":
     if len(sys.argv) < 3:
-        print("使い方: python backend/archive.py <URL> <出力ファイル名.html>")
+        print("使い方: python backend/archive.py <記事ID> <URL>")
         sys.exit(1)
         
-    archive_page(sys.argv[1], sys.argv[2])
+    arg1 = sys.argv[1]
+    arg2 = sys.argv[2]
+    
+    # URLとIDの指定順が逆でも自動判定
+    if arg1.startswith("http://") or arg1.startswith("https://"):
+        url = arg1
+        article_id = arg2
+    else:
+        article_id = arg1
+        url = arg2
+        
+    archive_page(article_id, url)
