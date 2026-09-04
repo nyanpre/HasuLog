@@ -1,4 +1,3 @@
-# backend/update_story_thumbnails.py
 import json
 import os
 import re
@@ -43,7 +42,11 @@ def get_best_thumbnail(video_id: str) -> str:
         return hq720_url
 
     # 3. フォールバック: mqdefault (320x180, 16:9)
-    return f"https://i.ytimg.com/vi/{video_id}/mqdefault.jpg"
+    mqdefault_url = f"https://i.ytimg.com/vi/{video_id}/mqdefault.jpg"
+    if check_image_exists(mqdefault_url):
+        return mqdefault_url
+
+    return ""
 
 def update_thumbnails():
     if not os.path.exists(JSON_PATH):
@@ -54,28 +57,44 @@ def update_thumbnails():
         story_data = json.load(f)
 
     updated_count = 0
+    skipped_items = []
 
     for item in story_data:
+        title = f"[{item.get('season', '')}] {item.get('title', '不明なタイトル')}"
         youtube_url = item.get("youtubeUrl", "").strip()
+
         if not youtube_url:
+            skipped_items.append({"title": title, "reason": "YouTube URLが未設定"})
             continue
 
         video_id = extract_video_id(youtube_url)
         if not video_id:
+            skipped_items.append({"title": title, "reason": f"動画ID抽出失敗 (URL: {youtube_url})"})
             continue
 
         thumbnail_url = get_best_thumbnail(video_id)
+        if not thumbnail_url:
+            skipped_items.append({"title": title, "reason": f"サムネイル取得失敗 (ID: {video_id})"})
+            continue
 
-        if item.get("thumbnailUrl") != thumbnail_url:
-            item["thumbnailUrl"] = thumbnail_url
-            updated_count += 1
-            quality = "maxres" if "maxres" in thumbnail_url else ("hq720" if "hq720" in thumbnail_url else "mqdefault")
-            print(f"✅ 設定 ({quality}): [{item.get('season', '')}] {item.get('title', '')}")
+        if item.get("thumbnailUrl") == thumbnail_url:
+            skipped_items.append({"title": title, "reason": "既に最新サムネイルが設定済み"})
+            continue
+
+        item["thumbnailUrl"] = thumbnail_url
+        updated_count += 1
+        quality = "maxres" if "maxres" in thumbnail_url else ("hq720" if "hq720" in thumbnail_url else "mqdefault")
+        print(f"✅ 設定 ({quality}): {title}")
 
     with open(JSON_PATH, 'w', encoding='utf-8') as f:
         json.dump(story_data, f, ensure_ascii=False, indent=2)
 
-    print(f"\n🎉 完了: {updated_count} / {len(story_data)} 件のサムネイルを高画質版に更新しました。")
+    print(f"\n🎉 完了: {updated_count} / {len(story_data)} 件のサムネイルを更新しました。")
+
+    if skipped_items:
+        print(f"\n⚠️ 更新されなかった項目 ({len(skipped_items)} 件):")
+        for skip in skipped_items:
+            print(f" - {skip['title']}: {skip['reason']}")
 
 if __name__ == "__main__":
     update_thumbnails()

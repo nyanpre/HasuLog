@@ -35,7 +35,11 @@ def get_best_thumbnail(video_id: str) -> str:
         return hq720_url
 
     # 3. フォールバック: mqdefault (320x180, 16:9)
-    return f"https://i.ytimg.com/vi/{video_id}/mqdefault.jpg"
+    mqdefault_url = f"https://i.ytimg.com/vi/{video_id}/mqdefault.jpg"
+    if check_image_exists(mqdefault_url):
+        return mqdefault_url
+
+    return ""
 
 def main():
     if not os.path.exists(JSON_FILE_PATH):
@@ -48,28 +52,44 @@ def main():
         videos = json.load(f)
 
     updated_count = 0
+    skipped_items = []
 
     for video in videos:
-        youtube_url = video.get("youtubeUrl", "")
+        title = video.get('title', '不明なタイトル')[:30]
+        youtube_url = video.get("youtubeUrl", "").strip()
+
         if not youtube_url:
+            skipped_items.append({"title": title, "reason": "YouTube URLが未設定"})
             continue
 
         video_id = get_youtube_video_id(youtube_url)
         if not video_id:
+            skipped_items.append({"title": title, "reason": f"動画ID抽出失敗 (URL: {youtube_url})"})
             continue
 
         new_thumb = get_best_thumbnail(video_id)
+        if not new_thumb:
+            skipped_items.append({"title": title, "reason": f"サムネイル取得失敗 (ID: {video_id})"})
+            continue
 
-        if video.get("thumbnailUrl") != new_thumb:
-            video["thumbnailUrl"] = new_thumb
-            updated_count += 1
-            quality = "maxres" if "maxres" in new_thumb else ("hq720" if "hq720" in new_thumb else "mqdefault")
-            print(f"✅ 更新 ({quality}): {video.get('title', '')[:30]}...")
+        if video.get("thumbnailUrl") == new_thumb:
+            skipped_items.append({"title": title, "reason": "既に最新サムネイルが設定済み"})
+            continue
+
+        video["thumbnailUrl"] = new_thumb
+        updated_count += 1
+        quality = "maxres" if "maxres" in new_thumb else ("hq720" if "hq720" in new_thumb else "mqdefault")
+        print(f"✅ 更新 ({quality}): {title}...")
 
     with open(JSON_FILE_PATH, 'w', encoding='utf-8') as f:
         json.dump(videos, f, ensure_ascii=False, indent=2)
 
     print(f"\n🎉 完了！ {updated_count} 件のサムネイルを高画質版に更新しました。")
+
+    if skipped_items:
+        print(f"\n⚠️ 更新されなかった項目 ({len(skipped_items)} 件):")
+        for skip in skipped_items:
+            print(f" - {skip['title']}: {skip['reason']}")
 
 if __name__ == '__main__':
     main()
