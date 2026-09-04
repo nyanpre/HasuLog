@@ -11,7 +11,7 @@ import { useStreams } from '../../contexts/StreamContext';
 import type { StreamData } from '../../types';
 
 type LayoutType = 1 | 2 | 4;
-type SortOrder = 'desc' | 'asc';
+type SortOrder = 'as' | 'asc';
 
 export default function Home() {
   const { records, updateRecord } = useUserRecords();

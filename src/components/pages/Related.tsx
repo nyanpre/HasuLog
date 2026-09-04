@@ -1,26 +1,27 @@
 // src/components/pages/Related.tsx
 import { useState, useMemo } from 'react';
-// 🌟 Filter アイコンを追加インポート
-import { Archive, ArrowUpDown, Filter } from 'lucide-react';
+// 🌟 画像と同じ形のアイコンに変更
+import { Archive, ArrowUpDown, Filter, AlignJustify, Columns2 } from 'lucide-react';
 
 import articlesData from '../related/data/articles.json';
 import { RelatedCard } from '../related/RelatedCard';
 import { RelatedViewerModal } from '../related/RelatedViewerModal';
 import type { Category, ContentItem } from '../related/types';
 
+type LayoutType = 1 | 2;
+
 export default function Related() {
   const [selectedContent, setSelectedContent] = useState<{ title: string; url: string } | null>(null);
   const [activeCategory, setActiveCategory] = useState<Category>('すべて');
   const [activeSource, setActiveSource] = useState<string>('すべて');
-  const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc'); // desc: 新しい順, asc: 古い順
-  
-  // 🌟 フィルターの開閉状態を管理するステート（初期値は閉じた状態）
+  const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
   const [isFilterOpen, setIsFilterOpen] = useState(false);
+  
+  const [layout, setLayout] = useState<LayoutType>(1);
 
   const categories: Category[] = ['すべて', '雑誌', 'メディア', '特設サイト'];
   const allContents = articlesData as ContentItem[];
 
-  // JSON内のデータから登録されている「媒体名」の一覧を動的に抽出
   const sources = useMemo(() => {
     const list = new Set<string>();
     allContents.forEach(item => {
@@ -29,7 +30,6 @@ export default function Related() {
     return ['すべて', ...Array.from(list)];
   }, [allContents]);
 
-  // フィルタリング & ソート処理
   const processedContents = useMemo(() => {
     return allContents
       .filter(item => {
@@ -44,35 +44,51 @@ export default function Related() {
       });
   }, [allContents, activeCategory, activeSource, sortOrder]);
 
+  const gridClass = layout === 1 ? 'grid-cols-1 gap-4' : 'grid-cols-2 gap-3';
+
   return (
     <div className="max-w-2xl mx-auto py-8 px-4 sm:px-6">
       {/* ヘッダー部 */}
       <div className="flex items-center justify-between mb-6">
-        {/* 🌟 ページタイトルを別ページ（記録・履歴）のデザインと統一 */}
         <h2 className="text-xl font-extrabold text-gray-800 flex items-center">
           <Archive className="w-6 h-6 mr-2 text-gray-600" />
           関連コンテンツ
         </h2>
 
-        {/* 🌟 ヘッダー右側のボタン群 */}
-        <div className="flex items-center gap-2">
-          {/* フィルター開閉ボタン */}
+        {/* ヘッダー右側のボタン群 */}
+        <div className="flex items-center gap-1.5 sm:gap-2">
+          
+          {/* 🌟 画像を再現したトグルスイッチ風ボタン (アイコン変更) */}
+          <div className="flex items-center bg-gray-100 p-0.5 rounded-lg mr-1">
+            <button 
+              onClick={() => setLayout(1)} 
+              className={`p-1.5 rounded-md transition-all duration-200 ${layout === 1 ? 'bg-white text-pink-600 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
+            >
+              <AlignJustify size={18} />
+            </button>
+            <button 
+              onClick={() => setLayout(2)} 
+              className={`p-1.5 rounded-md transition-all duration-200 ${layout === 2 ? 'bg-white text-pink-600 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
+            >
+              <Columns2 size={18} />
+            </button>
+          </div>
+
           <button
             onClick={() => setIsFilterOpen(!isFilterOpen)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-bold transition-colors shadow-sm ${
+            className={`flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg border text-[11px] sm:text-xs font-bold transition-colors shadow-sm ${
               isFilterOpen 
                 ? 'bg-pink-50 border-pink-200 text-pink-600' 
                 : 'bg-white border-gray-200 text-gray-600 hover:border-pink-200 hover:text-pink-600'
             }`}
           >
             <Filter size={14} />
-            絞り込み
+            <span className="hidden sm:inline">絞り込み</span>
           </button>
           
-          {/* ソート切り替えボタン */}
           <button
             onClick={() => setSortOrder(prev => prev === 'desc' ? 'asc' : 'desc')}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-xs font-bold text-gray-600 hover:border-pink-200 hover:text-pink-600 transition-colors shadow-sm"
+            className="flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-[11px] sm:text-xs font-bold text-gray-600 hover:border-pink-200 hover:text-pink-600 transition-colors shadow-sm"
           >
             <ArrowUpDown size={14} />
             {sortOrder === 'desc' ? '新しい順' : '古い順'}
@@ -80,10 +96,8 @@ export default function Related() {
         </div>
       </div>
 
-      {/* 🌟 フィルターエリア（isFilterOpen が true の時のみ表示） */}
       {isFilterOpen && (
         <div className="flex flex-col gap-3 mb-6 bg-white p-3.5 rounded-xl border border-gray-100 shadow-sm animate-fade-in">
-          {/* カテゴリフィルター */}
           <div className="flex items-center gap-2">
             <span className="text-[11px] font-bold text-gray-400 whitespace-nowrap w-12">種別:</span>
             <div className="flex overflow-x-auto custom-scrollbar gap-1.5 flex-1 pb-1">
@@ -103,7 +117,6 @@ export default function Related() {
             </div>
           </div>
 
-          {/* 媒体名フィルター（媒体が2件以上ある場合のみ表示） */}
           {sources.length > 2 && (
             <div className="flex items-center gap-2 pt-2 border-t border-gray-100">
               <span className="text-[11px] font-bold text-gray-400 whitespace-nowrap w-12">媒体:</span>
@@ -127,13 +140,13 @@ export default function Related() {
         </div>
       )}
 
-      {/* 記事一覧 */}
       {processedContents.length > 0 ? (
-        <div className="flex flex-col gap-4">
+        <div className={`grid ${gridClass}`}>
           {processedContents.map((item) => (
             <RelatedCard 
               key={item.id} 
               item={item} 
+              columns={layout}
               onSelectContent={(title, url) => setSelectedContent({ title, url })}
             />
           ))}
@@ -144,7 +157,6 @@ export default function Related() {
         </div>
       )}
 
-      {/* ビューアモーダル */}
       <RelatedViewerModal 
         content={selectedContent} 
         onClose={() => setSelectedContent(null)} 

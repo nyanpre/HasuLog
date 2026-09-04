@@ -42,7 +42,13 @@ def extract_meta(output_path):
         pass
     return title, description
 
-def archive_series(series_id: str, urls: list):
+def clean_title(title: str) -> str:
+    """タイトルの末尾につくサイト名やページャー表記などをスッキリさせる"""
+    t = title.split('|')[0].strip()
+    t = re.sub(r'【前編】|【後編】|（前編）|（後編）', '', t).strip()
+    return t
+
+def archive_series(item_id: str, urls: list):
     base_dir = os.path.dirname(os.path.abspath(__file__))
     project_root = os.path.dirname(base_dir)
     target_dir = os.path.join(project_root, "public", "archives")
@@ -54,54 +60,9 @@ def archive_series(series_id: str, urls: list):
         print("❌ Playwright 版 Chromium が見つかりません。")
         sys.exit(1)
     
-    print(f"🔄 連載記事のアーカイブを開始します (ID: {series_id})")
-    print(f"対象URL数: {len(urls)}件")
+    print(f"🔄 アーカイブ処理を開始します (ID: {item_id})")
+    print(f"対象URL数: {len(urls)}件 (すべて同種類の1つの記事として処理します)")
     
-    parts = []
-    series_title = ""
-    series_desc = ""
-
-    for i, url in enumerate(urls):
-        part_num = i + 1
-        output_filename = f"{series_id}-{part_num}.html"
-        output_path = os.path.join(target_dir, output_filename)
-        
-        print(f"\n[{part_num}/{len(urls)}] ダウンロード中: {url}")
-        
-        command = [
-            "npx",
-            "single-file-cli",
-            url,
-            output_path,
-            "--browser-executable-path", browser_path,
-            "--browser-args", '["--no-sandbox","--disable-setuid-sandbox","--disable-dev-shm-usage","--headless=new"]'
-        ]
-        
-        result = subprocess.run(command)
-        if result.returncode != 0:
-            print(f"❌ 失敗しました (エラーコード: {result.returncode})")
-            continue
-        
-        print(f"✅ 保存完了: {output_filename}")
-        
-        # 保存したHTMLからメタデータを抽出
-        title, desc = extract_meta(output_path)
-        
-        # 1件目のタイトルと説明を「シリーズ全体」の代表として採用
-        if i == 0:
-            series_title = title
-            series_desc = desc
-            
-        parts.append({
-            "label": f"第{part_num}回: {title}",
-            "url": f"/archives/{output_filename}"
-        })
-
-    if not parts:
-        print("\n❌ 1件も取得できませんでした。")
-        return
-
-    # --- JSONへの自動追記・更新処理 ---
     json_path = os.path.join(project_root, "src", "components", "related", "data", "articles.json")
     today = datetime.now().strftime("%Y-%m-%d")
     
@@ -113,46 +74,88 @@ def archive_series(series_id: str, urls: list):
         except Exception as e:
             print(f"⚠️ JSON読み込みエラー: {e}")
 
+    parts = []
+    item_title = ""
+    item_desc = ""
+
+    for i, url in enumerate(urls):
+        part_num = i + 1
+        output_filename = f"{item_id}-{part_num}.html"
+        output_path = os.path.join(target_dir, output_filename)
+        
+        print(f"\n[{part_num}/{len(urls)}] ダウンロード中: {url}")
+        
+        command = [
+            "npx",
+            "single-file-cli",
+            url,
+            output_path,
+            "--browser-executable-path", browser_path,
+            "--load-deferred-images",
+            "--load-deferred-images-dispatch-scroll-event",
+            "--browser-wait-delay", "2000",
+            "--browser-args", '["--no-sandbox","--disable-setuid-sandbox","--disable-dev-shm-usage","--headless=new"]'
+        ]
+        
+        result = subprocess.run(command)
+        if result.returncode != 0:
+            print(f"❌ 失敗しました (エラーコード: {result.returncode})")
+            continue
+        
+        print(f"✅ 保存完了: {output_filename}")
+        
+        title, desc = extract_meta(output_path)
+        
+        # 1件目のタイトルと説明を代表として採用
+        if i == 0:
+            item_title = clean_title(title)
+            item_desc = desc
+            
+        parts.append({
+            "label": f"第{part_num}ページ",
+            "url": f"/archives/{output_filename}"
+        })
+
+    if not parts:
+        print("\n❌ 1件も取得できませんでした。")
+        return
+
+    # --- JSONへの自動追記・更新処理 ---
     updated = False
     for article in articles:
-        # 指定された series_id と同じものがあれば上書き
-        if article.get("id") == series_id:
-            article["parts"] = parts # 最新のURLリストに更新
-            
-            # まだ説明が手入力されていない（初期値のまま）場合のみ、再抽出したものを入れる
+        if article.get("id") == item_id:
+            article["parts"] = parts
             if article.get("description") == "ここに説明を入力" or not article.get("description"):
-                article["description"] = series_desc
-                
+                article["description"] = item_desc
             updated = True
-            print(f"\n🔄 既存の連載データ(ID: {series_id})にコンテンツを統合しました。")
+            print(f"\n🔄 既存のデータ(ID: {item_id})を更新しました。")
             break
             
     if not updated:
-        # 存在しない場合は新規作成
         new_article = {
-            "id": series_id,
-            "title": series_title,
-            "description": series_desc,
+            "id": item_id,
+            "title": item_title,
+            "description": item_desc,
             "publishedDate": today,
             "category": "メディア",
+            "source": "アニメイトタイムズ", # 必要に応じて書き換えてください
             "parts": parts
         }
         articles.append(new_article)
-        print(f"\n✨ 新規連載データを追加しました(ID: {series_id})。")
+        print(f"\n✨ 新規データを追加しました(ID: {item_id})。")
 
     try:
         with open(json_path, 'w', encoding='utf-8') as f:
             json.dump(articles, f, ensure_ascii=False, indent=2)
-        print(f"📝 {json_path} の保存が完了しました！")
-        print("※ シリーズのタイトル(title)は1件目のページ名になっています。必要に応じてJSONで手直ししてください。")
+        print(f"\n📝 {json_path} の保存が完了しました！")
     except Exception as e:
         print(f"❌ JSONの書き込みに失敗しました: {e}")
 
 if __name__ == "__main__":
     if len(sys.argv) < 3:
-        print("使い方: python backend/archive_series.py <シリーズID> <URL1> <URL2> <URL3> ...")
+        print("使い方: python backend/archive_series.py <記事ID> <URL1> <URL2> <URL3> ...")
         sys.exit(1)
         
-    series_id = sys.argv[1]
+    item_id = sys.argv[1]
     target_urls = sys.argv[2:]
-    archive_series(series_id, target_urls)
+    archive_series(item_id, target_urls)

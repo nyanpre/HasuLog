@@ -5,19 +5,43 @@ import json
 import re
 
 try:
-    from bs4 import BeautifulSoup
+    from BeautifulSoup import BeautifulSoup
 except ImportError:
-    print("❌ BeautifulSoup4 がインストールされていません。")
-    print("ターミナルで 'pip install beautifulsoup4' を実行してから再度お試しください。")
-    sys.exit(1)
+    try:
+        from bs4 import BeautifulSoup
+    except ImportError:
+        print("❌ BeautifulSoup4 がインストールされていません。")
+        print("ターミナルで 'pip install beautifulsoup4' を実行してから再度お試しください。")
+        sys.exit(1)
 
 def extract_image_from_html(html_path):
-    """HTMLからサムネイル画像を抽出する（サイトヘッダー要素を除外）"""
+    """HTMLからサムネイル画像を抽出する"""
     try:
         with open(html_path, 'r', encoding='utf-8') as f:
             content = f.read()
 
-        # 1. まず og:image を探す
+        soup = BeautifulSoup(content, 'html.parser')
+
+        # 🌟 0. 最優先: eyecatch系プレースホルダー、l-article-eyecatch、m-article-eyecatch-content-link 内の画像を探す
+        eyecatch_img = soup.select_one(
+            '.eyecatch-placeholder img, #eyecatch-placeholder img, '
+            '.l-article-eyecatch img, #l-article-eyecatch img, '
+            '.m-article-eyecatch-content-link img'
+        )
+        if eyecatch_img and eyecatch_img.get('src'):
+            parent_str = ""
+            for parent in eyecatch_img.parents:
+                parent_str += str(parent.get('class', [])) + str(parent.get('id', ''))
+
+            source_label = "eyecatch-placeholder"
+            if 'l-article-eyecatch' in parent_str:
+                source_label = "l-article-eyecatch"
+            elif 'm-article-eyecatch-content-link' in parent_str:
+                source_label = "m-article-eyecatch-content-link"
+
+            return eyecatch_img.get('src').strip(), source_label
+
+        # 1. 次に og:image を探す
         match = re.search(r'<meta[^>]*property=["\']og:image["\'][^>]*content=["\'](.*?)["\']', content, re.IGNORECASE)
         if not match:
             match = re.search(r'<meta[^>]*content=["\'](.*?)["\'][^>]*property=["\']og:image["\']', content, re.IGNORECASE)
@@ -26,35 +50,28 @@ def extract_image_from_html(html_path):
             return match.group(1).strip(), "og:image"
 
         # 2. og:image がない場合、コンテンツ内の1枚目の画像を探す
-        soup = BeautifulSoup(content, 'html.parser')
-        
         for img in soup.find_all('img'):
             src = img.get('src')
             if not src:
                 continue
 
             is_in_header = False
-            # 画像の親要素を遡ってチェック
             for parent in img.parents:
                 classes = parent.get('class', [])
                 if isinstance(classes, str):
                     classes = [classes]
                 
-                # 🌟 追加: 本文内のヘッダー（detail__headerなど）はサイトヘッダーとみなさずスキップ
                 if classes and any('detail__header' in c.lower() for c in classes):
                     continue 
 
-                # <header> タグの中か？
                 if parent.name == 'header':
                     is_in_header = True
                     break
                 
-                # class名に "header" が含まれるか？ (site-header, global-header など)
                 if classes and any('header' in c.lower() for c in classes):
                     is_in_header = True
                     break
             
-            # サイト全体のヘッダー内でなければ、それを「コンテンツ内の1枚目」として採用
             if not is_in_header:
                 return src.strip(), "コンテンツ内の1枚目"
 
@@ -102,7 +119,7 @@ def update_thumbnails():
             if new_img_url:
                 current_img_url = article.get("thumbnailUrl", "")
                 
-                # 既存のURLと異なる場合のみ上書き更新
+                # 🌟 既存のURLの有無にかかわらず、取得できた新しい画像URLが現在の値と異なる（または未設定）なら常に更新する
                 if current_img_url != new_img_url:
                     article["thumbnailUrl"] = new_img_url
                     updated_count += 1
@@ -111,7 +128,7 @@ def update_thumbnails():
                     print(f"✅ 更新({extract_type}): {article['title'][:20]}...")
                     print(f"   -> {display_url}")
                 else:
-                    pass # 変更なしの場合はログを出さない（スッキリさせるため）
+                    pass 
             else:
                 print(f"⚠️ 画像が一切見つかりません: {article['title'][:20]}...")
         else:
