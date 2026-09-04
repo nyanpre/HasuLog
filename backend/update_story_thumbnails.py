@@ -2,6 +2,7 @@
 import json
 import os
 import re
+import urllib.request
 
 JSON_PATH = os.path.join(os.path.dirname(__file__), "../src/data/story_wiki_data.json")
 
@@ -9,7 +10,6 @@ def extract_video_id(url: str) -> str:
     """YouTubeのURLから動画IDを抽出する"""
     if not url:
         return ""
-    # 通常のwatch?v=、短縮url youtu.be/、埋め込みurl embed/ に対応
     patterns = [
         r'(?:v=|\/)([0-9A-Za-z_-]{11}).*',
         r'youtu\.be\/([0-9A-Za-z_-]{11})',
@@ -20,6 +20,30 @@ def extract_video_id(url: str) -> str:
         if match:
             return match.group(1)
     return ""
+
+def check_image_exists(url: str) -> bool:
+    """画像の存在確認（HEADリクエストで高速確認）"""
+    try:
+        req = urllib.request.Request(url, method='HEAD')
+        with urllib.request.urlopen(req, timeout=3) as res:
+            return res.status == 200
+    except Exception:
+        return False
+
+def get_best_thumbnail(video_id: str) -> str:
+    """最高画質(1280x720)を優先し、なければフォールバック"""
+    # 1. 最高画質 (1280x720, 16:9, 黒帯なし)
+    maxres_url = f"https://i.ytimg.com/vi/{video_id}/maxresdefault.jpg"
+    if check_image_exists(maxres_url):
+        return maxres_url
+
+    # 2. HQ720 (1280x720, 16:9)
+    hq720_url = f"https://i.ytimg.com/vi/{video_id}/hq720.jpg"
+    if check_image_exists(hq720_url):
+        return hq720_url
+
+    # 3. フォールバック: mqdefault (320x180, 16:9)
+    return f"https://i.ytimg.com/vi/{video_id}/mqdefault.jpg"
 
 def update_thumbnails():
     if not os.path.exists(JSON_PATH):
@@ -37,17 +61,21 @@ def update_thumbnails():
             continue
 
         video_id = extract_video_id(youtube_url)
-        if video_id:
-            # 16:9比率で黒帯が出ない mqdefault.jpg を設定
-            thumbnail_url = f"https://i.ytimg.com/vi/{video_id}/mqdefault.jpg"
+        if not video_id:
+            continue
+
+        thumbnail_url = get_best_thumbnail(video_id)
+
+        if item.get("thumbnailUrl") != thumbnail_url:
             item["thumbnailUrl"] = thumbnail_url
             updated_count += 1
-            print(f"✅ サムネイル設定: [{item.get('season', '')}] {item.get('title', '')} -> {thumbnail_url}")
+            quality = "maxres" if "maxres" in thumbnail_url else ("hq720" if "hq720" in thumbnail_url else "mqdefault")
+            print(f"✅ 設定 ({quality}): [{item.get('season', '')}] {item.get('title', '')}")
 
     with open(JSON_PATH, 'w', encoding='utf-8') as f:
         json.dump(story_data, f, ensure_ascii=False, indent=2)
 
-    print(f"\n🎉 完了: {updated_count} / {len(story_data)} 件のサムネイルURLを更新しました。")
+    print(f"\n🎉 完了: {updated_count} / {len(story_data)} 件のサムネイルを高画質版に更新しました。")
 
 if __name__ == "__main__":
     update_thumbnails()

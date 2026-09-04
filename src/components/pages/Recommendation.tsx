@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { doc, getDoc, setDoc } from 'firebase/firestore'; 
 import { db } from '../../firebase'; 
 
-import { Loader2, Star } from 'lucide-react';
+import { Loader2, Star, Lock } from 'lucide-react'; // 🌟 Lockアイコン追加
 import { StreamCard } from '../stream/StreamCard';
 import { StreamDetailModal } from '../stream/StreamDetailModal';
 import { useUserRecords } from '../../hooks/useUserRecords';
@@ -13,7 +13,6 @@ import { useStreams } from '../../contexts/StreamContext';
 import { useUserData } from '../../hooks/useUserData';
 import { useAuth } from '../../contexts/AuthContext';
 
-// 🌟 おすすめ抽選の対象とする配信種別
 const RECOMMENDED_TYPES = ['with_meets', 'with_station'];
 
 export default function Recommendation() {
@@ -26,6 +25,10 @@ export default function Recommendation() {
   const [selectedStream, setSelectedStream] = useState<StreamData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  // 🌟 ゲストユーザー判定
+  const isGuest = currentUser?.isAnonymous ?? false;
+
+  // 午前0時切り替え
   const getTodayStr = () => {
     const today = new Date();
     return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
@@ -33,13 +36,45 @@ export default function Recommendation() {
 
   useEffect(() => {
     if (isStreamsLoading || isAuthLoading) return;
+
+    // 🌟 ゲストユーザーはおすすめ処理・通信を一切行わない
+    if (isGuest) {
+      setIsLoading(false);
+      return;
+    }
+
     if (currentUser && !currentUser.isAnonymous && isUserLoading) return;
 
     const fetchTodayRecommendation = async () => {
       try {
         const todayStr = getTodayStr();
-        const isEx = Boolean(userData?.exMode === true);
+        // Layout側で保存したキャッシュを利用し、ユーザー情報の余分な通信待ちをカット
+        const isEx = localStorage.getItem('hasulog_isExMode') === 'true' || Boolean(userData?.exMode === true);
 
+        // 🌟 1. ローカルキャッシュ判定（通信負荷・ラグをゼロに）
+        const cachedRecStr = localStorage.getItem('hasulog_daily_rec');
+        if (cachedRecStr) {
+          try {
+            const cachedRec = JSON.parse(cachedRecStr);
+            // キャッシュが今日のものであればそのまま利用
+            if (cachedRec.date === todayStr && cachedRec.streamId_all) {
+              const targetId = isEx 
+                ? cachedRec.streamId_all 
+                : (cachedRec.streamId_official || cachedRec.streamId_all);
+                
+              const stream = streams.find(s => s.id === targetId);
+              if (stream && RECOMMENDED_TYPES.includes(stream.type)) {
+                setRecommendedStream(stream);
+                setIsLoading(false);
+                return; // 🚀 キャッシュがあればFirestoreを読まずにここで終了
+              }
+            }
+          } catch (e) {
+            console.error("キャッシュパースエラー", e);
+          }
+        }
+
+        // 🌟 2. キャッシュがない場合のみ Firestore から取得
         const recRef = doc(db, 'system', 'recommendation');
         const recSnap = await getDoc(recRef);
         
@@ -51,7 +86,7 @@ export default function Recommendation() {
           shownIds_official: [] 
         };
 
-        // 🌟 パターンA: 既に「今日の動画」がFirestoreにある場合
+        // パターンA: 既に「今日の動画」がFirestoreにある場合（誰かが既に引いた）
         if (recData.date === todayStr && (recData.streamId_all || recData.streamId_official || recData.streamId)) {
           const targetId = isEx 
             ? (recData.streamId_all || recData.streamId) 
@@ -59,15 +94,19 @@ export default function Recommendation() {
           
           const stream = streams.find(s => s.id === targetId);
           
-          // 💡 取得した今日の動画が RECOMMENDED_TYPES に含まれているかチェック
-          // 含まれていなければパターンAをスキップし、すぐ下で再抽選させる
           if (stream && RECOMMENDED_TYPES.includes(stream.type)) {
             setRecommendedStream(stream);
+            // 次回アクセス時用にローカルにキャッシュ
+            localStorage.setItem('hasulog_daily_rec', JSON.stringify({
+              date: todayStr,
+              streamId_all: recData.streamId_all || recData.streamId,
+              streamId_official: recData.streamId_official || recData.streamId_all || recData.streamId
+            }));
             return;
           }
         }
 
-        // 🌟 パターンB: 新しく抽選する場合（With×MEETS / With×STATION のみ）
+        // パターンB: 自分が今日の最初にアクセスして新しくランダム抽選する場合
         const validStreamsAll = streams.filter(
           s => s.youtubeUrl && 
                s.youtubeUrl.trim() !== "" && 
@@ -90,6 +129,7 @@ export default function Recommendation() {
           shownIds_all = [];
           unshown_all = validStreamsAll;
         }
+        // 💡 ランダム抽選ロジックをそのまま維持
         const candidate_all = unshown_all[Math.floor(Math.random() * unshown_all.length)];
 
         let candidate_official = null;
@@ -109,7 +149,14 @@ export default function Recommendation() {
         const targetStream = isEx ? candidate_all : candidate_official;
         setRecommendedStream(targetStream);
 
-        // Firestoreへの保存（上書き）
+        // 抽選結果をローカルキャッシュに保存
+        localStorage.setItem('hasulog_daily_rec', JSON.stringify({
+          date: todayStr,
+          streamId_all: candidate_all.id,
+          streamId_official: candidate_official.id
+        }));
+
+        // Firestoreへの保存（※ルールを修正したことで、非認証ユーザー①も保存可能になります）
         try {
           const new_shownIds_all = Array.from(new Set([...shownIds_all, candidate_all.id]));
           const new_shownIds_official = Array.from(new Set([...shownIds_official, candidate_official.id]));
@@ -122,7 +169,7 @@ export default function Recommendation() {
             shownIds_official: new_shownIds_official
           }, { merge: true });
         } catch (writeErr) {
-          console.warn("Firestoreへのおすすめ更新権限がありません（閲覧のみ継続）:", writeErr);
+          console.warn("Firestoreへのおすすめ更新エラー:", writeErr);
         }
 
       } catch (error) {
@@ -133,7 +180,7 @@ export default function Recommendation() {
     };
 
     fetchTodayRecommendation();
-  }, [streams, isStreamsLoading, userData, isUserLoading, currentUser, isAuthLoading]);
+  }, [streams, isStreamsLoading, userData, isUserLoading, currentUser, isAuthLoading, isGuest]);
 
   return (
     <div className="p-4 relative pb-20">
@@ -142,12 +189,23 @@ export default function Recommendation() {
         <h2 className="text-lg font-bold text-gray-800">今日のおすすめ</h2>
       </div>
 
-      {isLoading || isStreamsLoading ? (
+      {isLoading || isStreamsLoading || isAuthLoading ? (
         <div className="flex justify-center items-center py-20">
           <Loader2 className="animate-spin text-gray-400" size={32} />
         </div>
+      ) : isGuest ? (
+        /* 🌟 ゲストユーザー用のロック画面 */
+        <div className="text-center py-16 bg-white rounded-xl border border-gray-200 shadow-sm animate-fade-in px-4">
+          <Lock className="text-gray-300 mx-auto mb-4" size={40} />
+          <h3 className="text-gray-700 font-bold mb-2">おすすめ機能はロックされています</h3>
+          <p className="text-gray-500 text-xs leading-relaxed">
+            今日のおすすめ動画機能は、<br className="sm:hidden" />
+            ログインユーザー限定の機能です。<br />
+            Googleアカウントでログインしてご利用ください。
+          </p>
+        </div>
       ) : recommendedStream ? (
-        <div className="max-w-md mx-auto">
+        <div className="max-w-md mx-auto animate-fade-in">
           <StreamCard 
             stream={recommendedStream} 
             columns={1}
@@ -161,9 +219,12 @@ export default function Recommendation() {
         </div>
       )}
 
-      <div className="max-w-md mx-auto mt-8">
-        <DailyThread />
-      </div>
+      {/* ゲストユーザーには DailyThread も表示しない */}
+      {!isGuest && (
+        <div className="max-w-md mx-auto mt-8">
+          <DailyThread />
+        </div>
+      )}
 
       {selectedStream && (
         <StreamDetailModal 

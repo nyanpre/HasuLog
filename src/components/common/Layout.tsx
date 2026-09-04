@@ -14,19 +14,23 @@ interface LayoutProps {
 export default function Layout({ children }: LayoutProps) {
   const [isHelpModalOpen, setIsHelpModalOpen] = useState(false);
   const { currentUser } = useAuth();
-  const [isExMode, setIsExMode] = useState(false);
+  
+  // 🌟 初期値を localStorage から同期的に取得（画面リロード時のアイコンのチラつきを防止）
+  const [isExMode, setIsExMode] = useState(() => {
+    return localStorage.getItem('hasulog_isExMode') === 'true';
+  });
 
   useEffect(() => {
     const checkExMode = async () => {
+      // ゲストや未ログイン時は false にしてキャッシュも削除
       if (!currentUser || currentUser.isAnonymous) {
         setIsExMode(false);
+        localStorage.removeItem('hasulog_isExMode');
         return;
       }
 
-      // セッションストレージを確認して無駄なFirestore読み取りを抑制
-      const cached = sessionStorage.getItem(`exMode_${currentUser.uid}`);
-      if (cached !== null) {
-        setIsExMode(cached === 'true');
+      // 🌟 すでにキャッシュがあればFirestore通信を完全にカット（サーバー負荷軽減）
+      if (localStorage.getItem('hasulog_isExMode') !== null) {
         return;
       }
 
@@ -35,7 +39,7 @@ export default function Layout({ children }: LayoutProps) {
         if (userDoc.exists()) {
           const enabled = !!userDoc.data().exMode;
           setIsExMode(enabled);
-          sessionStorage.setItem(`exMode_${currentUser.uid}`, String(enabled));
+          localStorage.setItem('hasulog_isExMode', String(enabled));
         }
       } catch (error) {
         console.error("exMode取得エラー:", error);
@@ -64,7 +68,6 @@ export default function Layout({ children }: LayoutProps) {
       </main>
 
       <nav className="bg-white border-t fixed bottom-0 w-full pb-safe-bottom z-10">
-        {/* 🌟 isExMode に応じて grid-cols-5 と grid-cols-6 を切り替え、等間隔を維持 */}
         <div className={`grid ${isExMode ? 'grid-cols-6' : 'grid-cols-5'} items-center h-[72px] pb-2 w-full px-[14px]`}>
           <Link to="/" className="flex flex-col items-center justify-center text-gray-500 hover:text-pink-500 transition-colors min-w-0">
             <Home size={22} className="flex-shrink-0" />
@@ -76,7 +79,6 @@ export default function Layout({ children }: LayoutProps) {
             <span className="text-[10px] mt-1 truncate">おすすめ</span>
           </Link>
 
-          {/* 🌟 認証ユーザー(exMode)のみ表示 */}
           {isExMode && (
             <Link to="/related" className="flex flex-col items-center justify-center text-gray-500 hover:text-pink-500 transition-colors min-w-0">
               <Archive size={22} className="flex-shrink-0" />
