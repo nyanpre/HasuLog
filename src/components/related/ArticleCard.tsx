@@ -1,4 +1,4 @@
-// src/components/related/RelatedCard.tsx
+// src/components/related/ArticleCard.tsx
 import { FileText, ChevronRight } from 'lucide-react';
 import type { ContentItem } from './types';
 
@@ -8,7 +8,8 @@ type Props = {
   onSelectContent: (title: string, url: string) => void;
 };
 
-export const RelatedCard = ({ item, columns, onSelectContent }: Props) => {
+// 🌟 関数名を RelatedCard から ArticleCard に変更
+export const ArticleCard = ({ item, columns, onSelectContent }: Props) => {
   // 🌟 2カラム（グリッド）表示かどうかを判定
   const isGrid = columns === 2;
 

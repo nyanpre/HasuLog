@@ -1,6 +1,5 @@
-// src/components/related/RelatedViewerModal.tsx
+// src/components/related/ArticleViewerModal.tsx
 import { Archive, X } from 'lucide-react';
-// 🌟 先ほど作成した展開用コンポーネントをインポート
 import { ArchiveViewer } from './ArchiveViewer';
 
 type Props = {
@@ -8,20 +7,18 @@ type Props = {
   onClose: () => void;
 };
 
-export const RelatedViewerModal = ({ content, onClose }: Props) => {
+export const ArticleViewerModal = ({ content, onClose }: Props) => {
   if (!content) return null;
 
   // ViteのBase設定（/HasuLog/ など）を自動で補完する関数
   const getActualUrl = (path: string) => {
     if (path.startsWith('/')) {
       const baseUrl = import.meta.env.BASE_URL; // 例: "/" や "/HasuLog/"
-      // 連続するスラッシュを防いで結合
       return baseUrl.endsWith('/') ? baseUrl + path.slice(1) : baseUrl + path;
     }
     return path;
   };
 
-  // 🌟 パス解決済みのURLと、Gzipかどうかの判定フラグ
   const actualUrl = getActualUrl(content.url);
   const isGzipArchive = content.url.endsWith('.gz');
 
@@ -42,10 +39,8 @@ export const RelatedViewerModal = ({ content, onClose }: Props) => {
       
       <div className="flex-1 bg-gray-100 w-full h-full relative flex items-center justify-center">
         {isGzipArchive ? (
-          // 🌟 Gzip形式の場合は展開用コンポーネントに任せる
           <ArchiveViewer gzUrl={actualUrl} />
         ) : (
-          // 🌟 従来のHTMLや外部URLの場合はそのまま表示
           <>
             <span className="absolute text-gray-400 text-xs font-bold">読み込み中...</span>
             <iframe 

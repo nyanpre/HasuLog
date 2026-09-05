@@ -17,5 +17,6 @@ export interface ContentItem {
   publishedDate: string;
   category: string;
   contentUrl?: string;
+  youtubeUrl?: string;
   parts?: ContentPart[];
 }
