@@ -1,30 +1,25 @@
 // src/components/pages/Home.tsx
 import { useState } from 'react';
 import { LayoutList, Grid2X2, Grid3X3, ArrowUpDown, Loader2 } from 'lucide-react';
-// 🌟 Firebase通信用のインポートを削除しました
 
 import { StreamCard } from '../stream/StreamCard';
 import { StreamDetailModal } from '../stream/StreamDetailModal';
 import { useUserRecords } from '../../hooks/useUserRecords';
-// 🌟 新しく作成した Context をインポート
 import { useStreams } from '../../contexts/StreamContext';
 import type { StreamData } from '../../types';
 
 type LayoutType = 1 | 2 | 4;
-type SortOrder = 'as' | 'asc';
+// 🌟 タイポを修正 ('as' → 'desc')
+type SortOrder = 'desc' | 'asc';
 
 export default function Home() {
   const { records, updateRecord } = useUserRecords();
   
-  // 🌟 Contextから動画データとローディング状態を受け取る
   const { streams, isLoading } = useStreams();
   
   const [layout, setLayout] = useState<LayoutType>(2);
   const [selectedStream, setSelectedStream] = useState<StreamData | null>(null);
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
-
-  // 🌟 ここにあった useState(streams) と useEffect(fetchStreams) による
-  // Firebaseからのデータ取得処理は完全に削除しました！
 
   const sortedStreams = [...streams].sort((a, b) => {
     const timeA = new Date(a.date || 0).getTime();
