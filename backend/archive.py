@@ -5,6 +5,7 @@ import glob
 import subprocess
 import re
 import json
+import gzip
 from datetime import datetime
 
 def get_chromium_path():
@@ -21,12 +22,10 @@ def extract_meta(output_path):
         with open(output_path, 'r', encoding='utf-8') as f:
             content = f.read()
             
-            # <title>の抽出
             t_match = re.search(r'<title[^>]*>(.*?)</title>', content, re.IGNORECASE | re.DOTALL)
             if t_match:
                 title = t_match.group(1).strip()
             
-            # description または og:description の抽出
             d_match = re.search(r'<meta[^>]*name=["\']description["\'][^>]*content=["\'](.*?)["\']', content, re.IGNORECASE)
             if not d_match:
                 d_match = re.search(r'<meta[^>]*content=["\'](.*?)["\'][^>]*name=["\']description["\']', content, re.IGNORECASE)
@@ -49,10 +48,10 @@ def archive_page(article_id: str, url: str):
     
     os.makedirs(target_dir, exist_ok=True)
     
-    # .html 拡張子の自動補正
-    clean_id = article_id.replace(".html", "")
+    clean_id = article_id.replace(".html.gz", "").replace(".html", "")
     output_filename = f"{clean_id}.html"
     output_path = os.path.join(target_dir, output_filename)
+    gz_output_path = f"{output_path}.gz"
 
     browser_path = get_chromium_path()
     if not browser_path:
@@ -61,29 +60,37 @@ def archive_page(article_id: str, url: str):
     
     print(f"🔄 アーカイブを開始します (ID: {clean_id})")
     print(f"URL: {url}")
-    print(f"出力先: {output_path}")
+    print(f"出力先: {gz_output_path}")
 
+    # エラーを起こしやすいオプションを除外し、安定動作する最小限の構成に変更
     command = [
-        "npx",
-        "single-file-cli",
-        url,
-        output_path,
+        "npx", "single-file-cli", url, output_path,
         "--browser-executable-path", browser_path,
+        "--load-deferred-images=true",
         "--browser-args", '["--no-sandbox","--disable-setuid-sandbox","--disable-dev-shm-usage","--headless=new"]'
     ]
     
+    # 失敗時にエラー内容がターミナルに出るように実行
     result = subprocess.run(command)
     
-    if result.returncode != 0:
+    if result.returncode != 0 or not os.path.exists(output_path):
         print(f"\n❌ アーカイブに失敗しました (エラーコード: {result.returncode})")
         return
 
-    print("\n✅ アーカイブ成功！HTMLを保存しました。")
-    
-    # HTMLからタイトルと説明を自動抽出
+    # メタデータ抽出
     title, desc = extract_meta(output_path)
 
-    # --- JSONへの自動追記・更新処理 ---
+    # Gzip圧縮
+    print("📦 Gzip圧縮中...")
+    with open(output_path, 'rb') as f_in:
+        with gzip.open(gz_output_path, 'wb', compresslevel=9) as f_out:
+            f_out.writelines(f_in)
+
+    # 元の生HTMLは削除
+    os.remove(output_path)
+    print(f"✅ アーカイブ成功！保存完了: {clean_id}.html.gz")
+
+    # --- JSONの自動追記・更新処理 ---
     json_path = os.path.join(project_root, "src", "components", "related", "data", "articles.json")
     today = datetime.now().strftime("%Y-%m-%d")
     
@@ -97,16 +104,25 @@ def archive_page(article_id: str, url: str):
 
     updated = False
     for article in articles:
-        # ID または元のURLで既存データを判定
         if article.get("id") == clean_id or article.get("originalUrl") == url:
             article["id"] = clean_id
-            article["title"] = title
-            article["contentUrl"] = f"/archives/{output_filename}"
+            article["contentUrl"] = f"/archives/{clean_id}.html.gz"
             if article.get("description") == "ここに説明を入力" or not article.get("description"):
                 article["description"] = desc
             updated = True
-            print(f"🔄 既存の記事データを更新しました (ID: {clean_id})")
+            print(f"🔄 既存記事データ(ID: {clean_id})を更新しました。")
             break
+
+        if article.get("parts"):
+            for part in article["parts"]:
+                target_filename = f"{clean_id}.html.gz"
+                if part.get("url") and (target_filename in part["url"] or f"{clean_id}.html" in part["url"]):
+                    part["url"] = f"/archives/{target_filename}"
+                    updated = True
+                    print(f"🔄 連載記事(ID: {article.get('id')})内のパーツURLを更新しました。")
+                    break
+            if updated:
+                break
             
     if not updated:
         new_article = {
@@ -116,7 +132,7 @@ def archive_page(article_id: str, url: str):
             "description": desc,
             "publishedDate": today,
             "category": "メディア",
-            "contentUrl": f"/archives/{output_filename}"
+            "contentUrl": f"/archives/{clean_id}.html.gz"
         }
         articles.append(new_article)
         print(f"✨ 新規記事データを追加しました (ID: {clean_id})")
@@ -136,7 +152,6 @@ if __name__ == "__main__":
     arg1 = sys.argv[1]
     arg2 = sys.argv[2]
     
-    # URLとIDの指定順が逆でも自動判定
     if arg1.startswith("http://") or arg1.startswith("https://"):
         url = arg1
         article_id = arg2
