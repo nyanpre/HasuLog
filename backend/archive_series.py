@@ -5,6 +5,7 @@ import glob
 import subprocess
 import re
 import json
+import gzip
 from datetime import datetime
 
 def get_chromium_path():
@@ -15,18 +16,15 @@ def get_chromium_path():
     return None
 
 def extract_meta(output_path):
+    # (既存のまま変更なし)
     title = "タイトルを取得できませんでした"
     description = "ここに説明を入力"
     try:
         with open(output_path, 'r', encoding='utf-8') as f:
             content = f.read()
-            
-            # <title>の抽出
             t_match = re.search(r'<title[^>]*>(.*?)</title>', content, re.IGNORECASE | re.DOTALL)
             if t_match:
                 title = t_match.group(1).strip()
-            
-            # <meta name="description"> または og:description の抽出（属性の順序違いにも対応）
             d_match = re.search(r'<meta[^>]*name=["\']description["\'][^>]*content=["\'](.*?)["\']', content, re.IGNORECASE)
             if not d_match:
                 d_match = re.search(r'<meta[^>]*content=["\'](.*?)["\'][^>]*name=["\']description["\']', content, re.IGNORECASE)
@@ -34,16 +32,13 @@ def extract_meta(output_path):
                 d_match = re.search(r'<meta[^>]*property=["\']og:description["\'][^>]*content=["\'](.*?)["\']', content, re.IGNORECASE)
             if not d_match:
                 d_match = re.search(r'<meta[^>]*content=["\'](.*?)["\'][^>]*property=["\']og:description["\']', content, re.IGNORECASE)
-                
             if d_match:
                 description = d_match.group(1).strip()
-                
     except Exception:
         pass
     return title, description
 
 def clean_title(title: str) -> str:
-    """タイトルの末尾につくサイト名やページャー表記などをスッキリさせる"""
     t = title.split('|')[0].strip()
     t = re.sub(r'【前編】|【後編】|（前編）|（後編）', '', t).strip()
     return t
@@ -61,7 +56,7 @@ def archive_series(item_id: str, urls: list):
         sys.exit(1)
     
     print(f"🔄 アーカイブ処理を開始します (ID: {item_id})")
-    print(f"対象URL数: {len(urls)}件 (すべて同種類の1つの記事として処理します)")
+    print(f"対象URL数: {len(urls)}件")
     
     json_path = os.path.join(project_root, "src", "components", "related", "data", "articles.json")
     today = datetime.now().strftime("%Y-%m-%d")
@@ -82,18 +77,21 @@ def archive_series(item_id: str, urls: list):
         part_num = i + 1
         output_filename = f"{item_id}-{part_num}.html"
         output_path = os.path.join(target_dir, output_filename)
+        # Gzip用ファイルパス
+        gz_output_path = f"{output_path}.gz"
         
         print(f"\n[{part_num}/{len(urls)}] ダウンロード中: {url}")
         
+        # SingleFileの容量削減オプションを追加
         command = [
-            "npx",
-            "single-file-cli",
-            url,
-            output_path,
+            "npx", "single-file-cli", url, output_path,
             "--browser-executable-path", browser_path,
             "--load-deferred-images",
             "--load-deferred-images-dispatch-scroll-event",
             "--browser-wait-delay", "2000",
+            "--remove-unused-fonts",   # 不要なフォントを削除
+            "--remove-video-src",      # 動画を削除して容量削減
+            "--remove-audio-src",      # 音声を削除
             "--browser-args", '["--no-sandbox","--disable-setuid-sandbox","--disable-dev-shm-usage","--headless=new"]'
         ]
         
@@ -102,18 +100,26 @@ def archive_series(item_id: str, urls: list):
             print(f"❌ 失敗しました (エラーコード: {result.returncode})")
             continue
         
-        print(f"✅ 保存完了: {output_filename}")
-        
+        # メタデータの抽出（圧縮前のHTMLから取得）
         title, desc = extract_meta(output_path)
         
-        # 1件目のタイトルと説明を代表として採用
+        # HTMLをGzipに圧縮
+        print("📦 Gzip圧縮中...")
+        with open(output_path, 'rb') as f_in:
+            with gzip.open(gz_output_path, 'wb', compresslevel=9) as f_out:
+                f_out.writelines(f_in)
+                
+        # 圧縮が終わったら元の重いHTMLを削除
+        os.remove(output_path)
+        print(f"✅ 保存完了: {output_filename}.gz")
+        
         if i == 0:
             item_title = clean_title(title)
             item_desc = desc
             
         parts.append({
             "label": f"第{part_num}ページ",
-            "url": f"/archives/{output_filename}"
+            "url": f"/archives/{output_filename}.gz" # URLの拡張子を.gzに変更
         })
 
     if not parts:
@@ -121,6 +127,7 @@ def archive_series(item_id: str, urls: list):
         return
 
     # --- JSONへの自動追記・更新処理 ---
+    # (既存のまま変更なし)
     updated = False
     for article in articles:
         if article.get("id") == item_id:
@@ -138,7 +145,7 @@ def archive_series(item_id: str, urls: list):
             "description": item_desc,
             "publishedDate": today,
             "category": "メディア",
-            "source": "アニメイトタイムズ", # 必要に応じて書き換えてください
+            "source": "アニメイトタイムズ",
             "parts": parts
         }
         articles.append(new_article)
