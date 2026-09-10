@@ -45,6 +45,13 @@ export const useStreamFilters = (streams: StreamData[], records: Record<string, 
   const [filterWatched, setFilterWatched] = useState<string>(() => sessionStorage.getItem('hl_watched') || "all");
   const [sortOrder, setSortOrder] = useState<"desc" | "asc">(() => (sessionStorage.getItem('hl_sort') as "desc" | "asc") || "desc");
   
+  // 🌟 検索キーワード & タイトルのみ対象フラグ
+  const [searchQuery, setSearchQuery] = useState<string>("");
+  const [isTitleOnly, setIsTitleOnly] = useState<boolean>(() => {
+    const saved = sessionStorage.getItem('hl_titleOnly');
+    return saved !== null ? saved === 'true' : false;
+  });
+
   const [memberFilters, setMemberFilters] = useState<Record<string, FilterState>>(() => {
     const saved = sessionStorage.getItem('hl_members');
     if (saved) {
@@ -60,8 +67,9 @@ export const useStreamFilters = (streams: StreamData[], records: Record<string, 
     sessionStorage.setItem('hl_type', filterType);
     sessionStorage.setItem('hl_watched', filterWatched);
     sessionStorage.setItem('hl_sort', sortOrder);
+    sessionStorage.setItem('hl_titleOnly', String(isTitleOnly));
     sessionStorage.setItem('hl_members', JSON.stringify(memberFilters));
-  }, [columns, isFilterOpen, filterSeason, filterType, filterWatched, sortOrder, memberFilters]);
+  }, [columns, isFilterOpen, filterSeason, filterType, filterWatched, sortOrder, isTitleOnly, memberFilters]);
 
   const setMemberFilter = (member: string, state: FilterState) => {
     setMemberFilters(prev => ({ ...prev, [member]: state }));
@@ -75,13 +83,36 @@ export const useStreamFilters = (streams: StreamData[], records: Record<string, 
     setFilterSeason("all");
     setFilterType("all");
     setFilterWatched("all");
+    setSearchQuery("");
+    setIsTitleOnly(false);
     resetMemberFilters();
   };
 
   const displayStreams = useMemo(() => {
     let result = [...streams];
 
-    // シーズン絞り込み
+    // 1. キーワード検索（タイトルのみ、または全体対象）
+    const trimmedQuery = searchQuery.trim().toLowerCase();
+    if (trimmedQuery) {
+      const keywords = trimmedQuery.split(/[\s ]+/).filter(Boolean);
+      result = result.filter((stream) => {
+        const targetText = isTitleOnly
+          ? (stream.title || '').toLowerCase()
+          : [
+              stream.title || '',
+              stream.description || '',
+              stream.participants || '',
+              stream.date || '',
+              stream.season || '',
+              ...(Array.isArray((stream as any).cast) ? (stream as any).cast : []),
+              ...(Array.isArray((stream as any).songs) ? (stream as any).songs : [])
+            ].join(' ').toLowerCase();
+
+        return keywords.every((kw) => targetText.includes(kw));
+      });
+    }
+
+    // 2. シーズン絞り込み
     if (filterSeason !== "all") {
       result = result.filter(s => {
         if (!s.season) return false;
@@ -92,12 +123,12 @@ export const useStreamFilters = (streams: StreamData[], records: Record<string, 
       });
     }
     
-    // 配信タイプ絞り込み（'mirapa_mc' にも対応）
+    // 3. 配信種別絞り込み
     if (filterType !== "all") {
       result = result.filter(s => s.type === filterType);
     }
 
-    // 視聴済み / 未視聴絞り込み
+    // 4. 視聴済み / 未視聴絞り込み
     if (filterWatched !== "all") {
       result = result.filter(s => {
         const viewCount = records[s.id]?.viewCount || 0;
@@ -107,7 +138,7 @@ export const useStreamFilters = (streams: StreamData[], records: Record<string, 
       });
     }
 
-    // メンバー絞り込み（participants または cast 配列の両方を走査）
+    // 5. メンバー絞り込み
     const includes = MEMBERS.filter(m => memberFilters[m] === "include");
     const excludes = MEMBERS.filter(m => memberFilters[m] === "exclude");
 
@@ -122,7 +153,7 @@ export const useStreamFilters = (streams: StreamData[], records: Record<string, 
       });
     }
 
-    // ソート処理
+    // 6. ソート処理
     result.sort((a, b) => {
       const is102A = a.season === "102期";
       const is102B = b.season === "102期";
@@ -166,14 +197,16 @@ export const useStreamFilters = (streams: StreamData[], records: Record<string, 
     });
 
     return result;
-  }, [streams, filterSeason, filterType, filterWatched, memberFilters, sortOrder, records]);
+  }, [streams, searchQuery, isTitleOnly, filterSeason, filterType, filterWatched, memberFilters, sortOrder, records]);
 
   const isFilteringMembers = Object.values(memberFilters).some(state => state !== "none");
-  const isAnyFilterActive = filterSeason !== "all" || filterType !== "all" || filterWatched !== "all" || isFilteringMembers;
+  const isAnyFilterActive = Boolean(searchQuery.trim()) || isTitleOnly || filterSeason !== "all" || filterType !== "all" || filterWatched !== "all" || isFilteringMembers;
 
   return {
     columns, setColumns,
     isFilterOpen, setIsFilterOpen,
+    searchQuery, setSearchQuery,
+    isTitleOnly, setIsTitleOnly, // 🌟 タイトルのみフラグをエクスポート
     filterSeason, setFilterSeason,
     filterType, setFilterType,
     filterWatched, setFilterWatched,

@@ -1,25 +1,25 @@
 // src/components/pages/Home.tsx
 import { useState } from 'react';
-import { LayoutList, Grid2X2, Grid3X3, ArrowUpDown, Loader2 } from 'lucide-react';
+import { LayoutList, Grid2X2, Grid3X3, ArrowUpDown, Loader2, Search } from 'lucide-react';
 
 import { StreamCard } from '../stream/StreamCard';
 import { StreamDetailModal } from '../stream/StreamDetailModal';
+import { StreamSearchModal } from '../stream/StreamSearchModal';
 import { useUserRecords } from '../../hooks/useUserRecords';
 import { useStreams } from '../../contexts/StreamContext';
 import type { StreamData } from '../../types';
 
 type LayoutType = 1 | 2 | 4;
-// 🌟 タイポを修正 ('as' → 'desc')
 type SortOrder = 'desc' | 'asc';
 
 export default function Home() {
   const { records, updateRecord } = useUserRecords();
-  
   const { streams, isLoading } = useStreams();
-  
+
   const [layout, setLayout] = useState<LayoutType>(2);
   const [selectedStream, setSelectedStream] = useState<StreamData | null>(null);
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
+  const [isSearchOpen, setIsSearchOpen] = useState<boolean>(false);
 
   const sortedStreams = [...streams].sort((a, b) => {
     const timeA = new Date(a.date || 0).getTime();
@@ -27,7 +27,7 @@ export default function Home() {
     return sortOrder === 'desc' ? timeB - timeA : timeA - timeB;
   });
 
-  const gridClass = 
+  const gridClass =
     layout === 1 ? 'grid-cols-1 gap-4' :
     layout === 2 ? 'grid-cols-2 gap-3' :
     'grid-cols-4 gap-2';
@@ -37,7 +37,7 @@ export default function Home() {
       <div className="flex justify-between items-center mb-4 bg-white p-2 rounded-lg shadow-sm">
         <div className="flex items-center space-x-2">
           <span className="text-sm font-bold text-gray-700">コンテンツ一覧</span>
-          <button 
+          <button
             onClick={() => setSortOrder(prev => prev === 'desc' ? 'asc' : 'desc')}
             className="flex items-center space-x-1 text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded active:scale-95 transition-transform"
           >
@@ -45,8 +45,20 @@ export default function Home() {
             <span>{sortOrder === 'desc' ? '新しい順' : '古い順'}</span>
           </button>
         </div>
-        
-        <div className="flex space-x-2">
+
+        <div className="flex items-center space-x-2">
+          {/* 検索モーダル起動ボタン */}
+          <button
+            onClick={() => setIsSearchOpen(true)}
+            className="flex items-center gap-1 text-xs font-bold text-gray-600 bg-gray-100 hover:bg-pink-50 hover:text-pink-600 px-2.5 py-1.5 rounded-md transition-colors"
+            title="キーワード検索"
+          >
+            <Search size={15} />
+            <span className="hidden sm:inline">検索</span>
+          </button>
+
+          <div className="h-4 w-[1px] bg-gray-200" />
+
           <button onClick={() => setLayout(1)} className={`p-1.5 rounded ${layout === 1 ? 'bg-pink-100 text-pink-600' : 'text-gray-400'}`}>
             <LayoutList size={20} />
           </button>
@@ -74,23 +86,31 @@ export default function Home() {
             const currentViewCount = currentRecord?.viewCount || 0;
 
             return (
-              <StreamCard 
-                key={stream.id} 
-                stream={stream} 
+              <StreamCard
+                key={stream.id}
+                stream={stream}
                 columns={layout}
                 viewCount={currentViewCount}
-                onClick={() => setSelectedStream(stream)} 
+                onClick={() => setSelectedStream(stream)}
               />
             );
           })}
         </div>
       )}
 
+      {/* 検索モーダル */}
+      <StreamSearchModal
+        isOpen={isSearchOpen}
+        onClose={() => setIsSearchOpen(false)}
+        streams={streams}
+        onSelectStream={(stream) => setSelectedStream(stream)}
+      />
+
       {selectedStream && (
-        <StreamDetailModal 
-          stream={selectedStream} 
+        <StreamDetailModal
+          stream={selectedStream}
           record={selectedStream ? (records[selectedStream.id] || null) : null}
-          onClose={() => setSelectedStream(null)} 
+          onClose={() => setSelectedStream(null)}
           onUpdateRecord={updateRecord}
         />
       )}
