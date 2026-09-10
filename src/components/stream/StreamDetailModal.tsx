@@ -4,7 +4,6 @@ import * as Dialog from '@radix-ui/react-dialog';
 import { doc, setDoc, updateDoc, deleteField } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { useAuth } from "../../contexts/AuthContext";
-// 🌟 修正: updateMemoBonus を削除
 import { addWatchRecord, removeWatchRecord, getStreamPoints } from "../../utils/pointSystem";
 import { WatchConfirmModal } from "../common/WatchConfirmModal";
 import { usePublicMemos } from "../../hooks/usePublicMemos";
@@ -38,7 +37,6 @@ export const StreamDetailModal = ({ stream, record, onClose, onUpdateRecord, isR
     setSaveStatus("idle");
   }, [record, stream]);
 
-  // 🌟 修正: メモボーナス関連の処理とポップアップを完全削除し、シンプルに保存するだけに変更
   const handleSaveMemo = async () => {
     if (typeof onUpdateRecord !== 'function' || !stream || !currentUser) return;
     
@@ -47,7 +45,6 @@ export const StreamDetailModal = ({ stream, record, onClose, onUpdateRecord, isR
       const isPublic = visibility === 'public_anonymous' || visibility === 'public_named';
       const hasText = localMemo.trim() !== '';
 
-      // 自分のレコードの保存
       await onUpdateRecord(stream.id, { 
         streamId: stream.id,
         memo: localMemo,
@@ -57,7 +54,6 @@ export const StreamDetailModal = ({ stream, record, onClose, onUpdateRecord, isR
         updatedAt: new Date().toISOString()
       });
 
-      // サマリードキュメント（みんなのメモ）へのコピー送信処理
       try {
         const publicMemoRef = doc(db, 'publicMemos', stream.id);
         if (isPublic && hasText) {
@@ -180,6 +176,9 @@ export const StreamDetailModal = ({ stream, record, onClose, onUpdateRecord, isR
   const extraUrls = getNormalizedExtraUrls();
   const hasMultipleUrls = extraUrls.length > 0;
 
+  // 🌟 出演者が空（null、undefined、空文字、空白のみ）でないかを判定
+  const hasParticipants = Boolean(stream?.participants && stream.participants.trim() !== "");
+
   return (
     <>
       <Dialog.Root open={!!stream} onOpenChange={(open) => !open && onClose()}>
@@ -236,7 +235,10 @@ export const StreamDetailModal = ({ stream, record, onClose, onUpdateRecord, isR
 
                   <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-600 mb-4 bg-gray-50 p-2 rounded">
                     <p><strong>配信日:</strong> {stream.date}</p>
-                    <p className="w-full mt-1"><strong>出演:</strong> {stream.participants || "不明"}</p>
+                    {/* 🌟 出演者が存在する場合のみ表示 */}
+                    {hasParticipants && (
+                      <p className="w-full mt-1"><strong>出演:</strong> {stream.participants}</p>
+                    )}
                   </div>
 
                   <div className="mb-4">

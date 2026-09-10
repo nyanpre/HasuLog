@@ -1,7 +1,7 @@
 // src/components/thread/DailyThread.tsx
-import { useState, useEffect, useRef, useMemo } from 'react'; // 🌟 useMemoを追加
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { MessageCircle, Send, Clock, User } from 'lucide-react';
-import { collection, query, where, onSnapshot, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, addDoc, serverTimestamp, getDocs, writeBatch } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useFriends } from '../../hooks/useFriends';
@@ -14,15 +14,18 @@ interface Comment {
   text: string;
   createdAt: any;
   dateStr: string;
+  streamId?: string;
 }
 
-export function DailyThread() {
+interface DailyThreadProps {
+  streamId?: string;
+}
+
+export function DailyThread({ streamId }: DailyThreadProps) {
   const { currentUser } = useAuth();
   const { friends } = useFriends();
   
-  // 🌟 修正1: 取得した全コメントを保持するステートに変更
   const [allComments, setAllComments] = useState<Comment[]>([]);
-  
   const [inputText, setInputText] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -32,11 +35,41 @@ export function DailyThread() {
     return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
   };
 
+  // 🌟 過去日の不要コメントを削除するクリーンアップ処理
+  const cleanOldComments = async (todayStr: string) => {
+    try {
+      // 本日以外のコメントを取得
+      const oldQuery = query(collection(db, 'dailyComments'), where('dateStr', '<', todayStr));
+      const snapshot = await getDocs(oldQuery);
+      
+      if (!snapshot.empty) {
+        const batch = writeBatch(db);
+        snapshot.docs.forEach((docSnap) => {
+          batch.delete(docSnap.ref);
+        });
+        await batch.commit();
+      }
+    } catch (err) {
+      // 削除権限エラーや通信エラー時もメインのチャットを止めない
+      console.warn("過去コメントの削除スキップ:", err);
+    }
+  };
+
   useEffect(() => {
     if (!currentUser) return;
 
     const todayStr = getTodayStr();
-    const q = query(collection(db, 'dailyComments'), where('dateStr', '==', todayStr));
+
+    const q = streamId
+      ? query(
+          collection(db, 'dailyComments'),
+          where('dateStr', '==', todayStr),
+          where('streamId', '==', streamId)
+        )
+      : query(
+          collection(db, 'dailyComments'),
+          where('dateStr', '==', todayStr)
+        );
     
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const fetchedComments = snapshot.docs.map(doc => ({
@@ -44,15 +77,12 @@ export function DailyThread() {
         ...doc.data()
       })) as Comment[];
 
-      // 🌟 修正2: ここではフィルタリングせず、一旦すべて保存する
       setAllComments(fetchedComments);
     });
 
     return () => unsubscribe();
-  }, [currentUser]); // 🌟 修正3: 依存配列から friends を削除！これでリスナーは1回しか作られません
+  }, [currentUser, streamId]);
 
-  // 🌟 修正4: 表示用のコメントリストを useMemo で作成する
-  // allComments か friends が更新された時だけ、画面表示用にフィルタリングと並び替えを行う
   const comments = useMemo(() => {
     return allComments
       .filter(c => c.uid === currentUser?.uid || friends.some(f => f.uid === c.uid))
@@ -73,6 +103,7 @@ export function DailyThread() {
     e.preventDefault();
     if (!inputText.trim() || !currentUser) return;
 
+    const todayStr = getTodayStr();
     setIsSubmitting(true);
     try {
       await addDoc(collection(db, 'dailyComments'), {
@@ -81,9 +112,13 @@ export function DailyThread() {
         photoURL: currentUser.photoURL || '',
         text: inputText.trim(),
         createdAt: serverTimestamp(),
-        dateStr: getTodayStr(), 
+        dateStr: todayStr,
+        streamId: streamId || '',
       });
       setInputText('');
+
+      // 🌟 送信のついでに過去の古いコメントを安全に削除
+      cleanOldComments(todayStr);
     } catch (error) {
       console.error("コメント送信エラー:", error);
       alert("送信に失敗しました。");
@@ -127,7 +162,6 @@ export function DailyThread() {
             const isMe = comment.uid === currentUser?.uid;
             return (
               <div key={comment.id} className={`flex gap-2 ${isMe ? 'flex-row-reverse' : 'flex-row'}`}>
-                {/* アイコン */}
                 <div className="w-8 h-8 rounded-full bg-pink-100 border border-pink-200 flex items-center justify-center overflow-hidden flex-shrink-0">
                   {comment.photoURL ? (
                     <img src={comment.photoURL} alt="" className="w-full h-full object-cover" />
@@ -136,7 +170,6 @@ export function DailyThread() {
                   )}
                 </div>
 
-                {/* コメント本体 */}
                 <div className={`flex flex-col ${isMe ? 'items-end' : 'items-start'} max-w-[75%]`}>
                   <span className="text-[10px] text-gray-500 font-bold mb-1 ml-1">{comment.displayName}</span>
                   <div className={`px-3 py-2 rounded-2xl text-sm shadow-sm ${

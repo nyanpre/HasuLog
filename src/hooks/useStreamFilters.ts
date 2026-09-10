@@ -79,6 +79,11 @@ export const useStreamFilters = (streams: StreamData[], records: Record<string, 
     setMemberFilters(MEMBERS.reduce((acc, member) => ({ ...acc, [member]: "none" }), {}));
   };
 
+  // 🌟 全員を一括で未出演（exclude）に設定する関数
+  const setAllMembersExclude = () => {
+    setMemberFilters(MEMBERS.reduce((acc, member) => ({ ...acc, [member]: "exclude" }), {}));
+  };
+
   const handleResetFilters = () => {
     setFilterSeason("all");
     setFilterType("all");
@@ -206,13 +211,14 @@ export const useStreamFilters = (streams: StreamData[], records: Record<string, 
     columns, setColumns,
     isFilterOpen, setIsFilterOpen,
     searchQuery, setSearchQuery,
-    isTitleOnly, setIsTitleOnly, // 🌟 タイトルのみフラグをエクスポート
+    isTitleOnly, setIsTitleOnly,
     filterSeason, setFilterSeason,
     filterType, setFilterType,
     filterWatched, setFilterWatched,
     sortOrder, setSortOrder,
     memberFilters, setMemberFilter,
     resetMemberFilters,
+    setAllMembersExclude, // 🌟 エクスポート
     handleResetFilters,
     displayStreams,
     isFilteringMembers,

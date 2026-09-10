@@ -19,11 +19,25 @@ export const VideoCard = ({ item, columns }: Props) => {
   };
 
   // カテゴリ・タイプからバッジのテキストと色を動的に決定
+  const isMirapa = item.category?.includes("みらぱ") || (item as any).type === "みらぱラジオ";
   const isMembership = item.category?.includes("メンバー") || (item as any).type === "メンバー限定";
   const isIntro = item.category?.includes("自己紹介") || (item as any).type === "自己紹介";
 
-  const badgeText = isMembership ? "メン限" : isIntro ? "自己紹介" : "せーはす";
-  const badgeColor = isMembership ? "bg-amber-500" : isIntro ? "bg-teal-500" : "bg-purple-500";
+  const badgeText = isMirapa 
+    ? (item.subCategory || "みらぱ") 
+    : isMembership 
+    ? "メン限" 
+    : isIntro 
+    ? "自己紹介" 
+    : "せーはす";
+
+  const badgeColor = isMirapa 
+    ? "bg-orange-500" 
+    : isMembership 
+    ? "bg-amber-500" 
+    : isIntro 
+    ? "bg-teal-500" 
+    : "bg-purple-500";
 
   return (
     <>
@@ -80,7 +94,7 @@ export const VideoCard = ({ item, columns }: Props) => {
           onClick={() => setIsOpen(false)}
         >
           <div 
-            className="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl relative animate-in fade-in zoom-in duration-200"
+            className="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl relative animate-in fade-in zoom-in duration-200 max-h-[90vh] flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
             <button 
@@ -90,33 +104,43 @@ export const VideoCard = ({ item, columns }: Props) => {
               <X size={20} />
             </button>
 
-            <h3 className="text-lg font-bold text-gray-800 mb-4">
+            <h3 className="text-lg font-bold text-gray-800 mb-3 flex-shrink-0">
               動画を視聴する
             </h3>
 
-            <div className="bg-gray-50 rounded-xl p-3 border border-gray-100 mb-5">
+            {/* モーダル内コンテンツ（長文ディスクリプションでも見やすいようスクロール対応） */}
+            <div className="bg-gray-50 rounded-xl p-3 border border-gray-100 mb-5 overflow-y-auto max-h-[50vh]">
               {item.thumbnailUrl && (
-                <div className="aspect-video w-full rounded-lg overflow-hidden mb-2.5">
+                <div className="aspect-video w-full rounded-lg overflow-hidden mb-2.5 flex-shrink-0">
                   <img src={item.thumbnailUrl} alt={item.title} className="w-full h-full object-cover" />
                 </div>
               )}
               <div className="text-[11px] text-gray-400 mb-1">{item.publishedDate}</div>
-              <p className="text-xs sm:text-sm font-semibold text-gray-800 line-clamp-2 leading-snug">
+              <p className="text-xs sm:text-sm font-bold text-gray-800 leading-snug mb-2">
                 {item.title}
               </p>
+
+              {/* ディスクリプション */}
+              {item.description && (
+                <div className="pt-2 border-t border-gray-200">
+                  <p className="text-xs text-gray-600 whitespace-pre-line leading-relaxed">
+                    {item.description}
+                  </p>
+                </div>
+              )}
             </div>
 
-            <div className="flex flex-col gap-2">
-              <button
+            <div className="flex flex-col gap-2 flex-shrink-0">
+              <button 
                 onClick={handleOpenVideo}
-                className="w-full py-3 px-4 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl flex items-center justify-center gap-2 shadow-sm transition-colors"
+                className="w-full py-3 px-4 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl flex items-center justify-center gap-2 shadow-sm transition-colors cursor-pointer"
               >
                 <ExternalLink size={18} />
                 YouTubeで視聴する
               </button>
-              <button
+              <button 
                 onClick={() => setIsOpen(false)}
-                className="w-full py-2.5 px-4 text-gray-500 hover:text-gray-700 font-bold rounded-xl transition-colors text-sm"
+                className="w-full py-2.5 px-4 text-gray-500 hover:text-gray-700 font-bold rounded-xl transition-colors text-sm cursor-pointer"
               >
                 キャンセル
               </button>

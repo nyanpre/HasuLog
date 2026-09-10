@@ -24,6 +24,7 @@ export interface ContentItem {
   description: string;
   publishedDate: string;
   category: string;
+  subCategory?: string;
   contentUrl?: string;   // StorageパスまたはHTMLパス
   storageUrl?: string;   // Firebase Storage 公開URL
   youtubeUrl?: string;

@@ -15,21 +15,19 @@ export default function Layout({ children }: LayoutProps) {
   const [isHelpModalOpen, setIsHelpModalOpen] = useState(false);
   const { currentUser } = useAuth();
   
-  // 🌟 初期値を localStorage から同期的に取得（画面リロード時のアイコンのチラつきを防止）
-  const [isExMode, setIsExMode] = useState(() => {
+  // 初期値を localStorage から同期的に取得
+  const [, setIsExMode] = useState(() => {
     return localStorage.getItem('hasulog_isExMode') === 'true';
   });
 
   useEffect(() => {
     const checkExMode = async () => {
-      // ゲストや未ログイン時は false にしてキャッシュも削除
       if (!currentUser || currentUser.isAnonymous) {
         setIsExMode(false);
         localStorage.removeItem('hasulog_isExMode');
         return;
       }
 
-      // 🌟 すでにキャッシュがあればFirestore通信を完全にカット（サーバー負荷軽減）
       if (localStorage.getItem('hasulog_isExMode') !== null) {
         return;
       }
@@ -68,7 +66,8 @@ export default function Layout({ children }: LayoutProps) {
       </main>
 
       <nav className="bg-white border-t fixed bottom-0 w-full pb-safe-bottom z-10">
-        <div className={`grid ${isExMode ? 'grid-cols-6' : 'grid-cols-5'} items-center h-[72px] pb-2 w-full px-[14px]`}>
+        {/* 常時6列で「関連」を表示 */}
+        <div className="grid grid-cols-6 items-center h-[72px] pb-2 w-full px-[14px]">
           <Link to="/" className="flex flex-col items-center justify-center text-gray-500 hover:text-pink-500 transition-colors min-w-0">
             <Home size={22} className="flex-shrink-0" />
             <span className="text-[10px] mt-1 truncate">ホーム</span>
@@ -79,12 +78,10 @@ export default function Layout({ children }: LayoutProps) {
             <span className="text-[10px] mt-1 truncate">おすすめ</span>
           </Link>
 
-          {isExMode && (
-            <Link to="/related" className="flex flex-col items-center justify-center text-gray-500 hover:text-pink-500 transition-colors min-w-0">
-              <Archive size={22} className="flex-shrink-0" />
-              <span className="text-[10px] mt-1 truncate">関連</span>
-            </Link>
-          )}
+          <Link to="/related" className="flex flex-col items-center justify-center text-gray-500 hover:text-pink-500 transition-colors min-w-0">
+            <Archive size={22} className="flex-shrink-0" />
+            <span className="text-[10px] mt-1 truncate">関連</span>
+          </Link>
 
           <Link to="/history" className="flex flex-col items-center justify-center text-gray-500 hover:text-pink-500 transition-colors min-w-0">
             <History size={22} className="flex-shrink-0" />

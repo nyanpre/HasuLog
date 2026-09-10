@@ -59,6 +59,7 @@ export const StreamList = () => {
     sortOrder, setSortOrder,
     memberFilters, setMemberFilter,
     resetMemberFilters,
+    setAllMembersExclude, // 🌟 全員未出演関数
     handleResetFilters,
     displayStreams,
     isFilteringMembers,
@@ -123,7 +124,7 @@ export const StreamList = () => {
   return (
     <div className="max-w-6xl mx-auto px-3 md:px-6 pb-24 relative">
       
-      {/* 🌟 ヘッダー(z-10)よりも下層(z-[5])に配置し、少し上(top-[46px])から潜り込ませる */}
+      {/* ヘッダー直下に配置 */}
       <div 
         ref={floatingRef}
         className="fixed top-[calc(46px+env(safe-area-inset-top,0px))] left-0 right-0 z-[5] max-w-6xl mx-auto px-3 md:px-6 pointer-events-none"
@@ -278,6 +279,7 @@ export const StreamList = () => {
         )}
       </div>
 
+      {/* 🌟 onSetAllExclude を渡す */}
       <MemberFilterModal 
         isOpen={isMemberPopupOpen}
         onClose={() => setIsMemberPopupOpen(false)}
@@ -285,6 +287,7 @@ export const StreamList = () => {
         memberFilters={memberFilters}
         setMemberFilter={setMemberFilter}
         resetMemberFilters={resetMemberFilters}
+        onSetAllExclude={setAllMembersExclude}
       />
 
       <StreamDetailModal 
