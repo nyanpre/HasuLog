@@ -9,6 +9,7 @@ import { StreamCard } from "./StreamCard";
 import { MemberFilterModal } from "./MemberFilterModal";
 import { StreamDetailModal } from "./StreamDetailModal";
 
+// 選択中のテキスト幅にだけ完全に一致するよう絶対配置を活用したSelect（h-[28px]に微縮小）
 const DynamicSelect = ({
   value,
   onChange,
@@ -21,14 +22,14 @@ const DynamicSelect = ({
   const currentLabel = options.find((o) => o.value === value)?.label || "";
 
   return (
-    <div className="relative inline-flex items-center h-[34px] bg-white border border-gray-300 rounded-md shadow-xs hover:bg-gray-50 transition-colors text-gray-700 text-xs sm:text-sm flex-shrink-0">
-      <span className="invisible whitespace-pre pl-2.5 pr-6 pointer-events-none">
+    <div className="relative inline-flex items-center h-[28px] bg-white border border-gray-300 rounded-md shadow-2xs hover:bg-gray-50 transition-colors text-gray-700 text-[11px] sm:text-xs flex-shrink-0">
+      <span className="invisible whitespace-pre pl-2 pr-5 pointer-events-none">
         {currentLabel}
       </span>
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="absolute inset-0 w-full h-full appearance-none bg-transparent pl-2.5 pr-6 focus:outline-none cursor-pointer z-10 text-gray-700 font-normal"
+        className="absolute inset-0 w-full h-full appearance-none bg-transparent pl-2 pr-5 focus:outline-none cursor-pointer z-10 text-gray-700 font-normal"
       >
         {options.map((opt) => (
           <option key={opt.value} value={opt.value}>
@@ -37,8 +38,8 @@ const DynamicSelect = ({
         ))}
       </select>
       <ChevronDown
-        size={14}
-        className="absolute right-1.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none z-0"
+        size={12}
+        className="absolute right-1 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none z-0"
       />
     </div>
   );
@@ -68,9 +69,8 @@ export const StreamList = () => {
   const [isMemberPopupOpen, setIsMemberPopupOpen] = useState<boolean>(false);
   const [selectedStream, setSelectedStream] = useState<StreamData | null>(null);
 
-  // 🌟 フローティング要素の高さを計測してカード側の余白を自動調整
   const floatingRef = useRef<HTMLDivElement>(null);
-  const [filterHeight, setFilterHeight] = useState<number>(140);
+  const [filterHeight, setFilterHeight] = useState<number>(110);
 
   useEffect(() => {
     if (!floatingRef.current) return;
@@ -124,50 +124,50 @@ export const StreamList = () => {
   return (
     <div className="max-w-6xl mx-auto px-3 md:px-6 pb-24 relative">
       
-      {/* 🌟 ヘッダーの直下（top-[49px]）にピタリと固定されるフローティング枠 */}
+      {/* フローティングバー */}
       <div 
         ref={floatingRef}
-        className="fixed top-[49px] left-0 right-0 z-30 max-w-6xl mx-auto px-3 md:px-6 pt-2 pointer-events-none"
+        className="fixed top-[49px] left-0 right-0 z-30 max-w-6xl mx-auto px-3 md:px-6 pt-1.5 pointer-events-none"
       >
-        <div className="bg-white/95 backdrop-blur-md rounded-xl shadow-lg border border-gray-200/90 overflow-hidden pointer-events-auto transition-all">
+        <div className="bg-white/95 backdrop-blur-md rounded-xl shadow-md border border-gray-200/90 overflow-hidden pointer-events-auto transition-all">
           <button 
             onClick={() => setIsFilterOpen(!isFilterOpen)}
-            className="w-full flex items-center justify-between p-3 bg-gray-50/90 hover:bg-gray-100/90 transition-colors"
+            className="w-full flex items-center justify-between py-2 px-3 bg-gray-50/90 hover:bg-gray-100/90 transition-colors"
           >
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-bold text-gray-700 flex items-center">
-                <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path></svg>
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs sm:text-sm font-bold text-gray-700 flex items-center">
+                <svg className="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path></svg>
                 表示切替・フィルター
               </span>
-              <span className="text-xs bg-gray-200/80 text-gray-600 font-bold px-2 py-0.5 rounded-full">
+              <span className="text-[10px] bg-gray-200/80 text-gray-600 font-bold px-1.5 py-0.2 rounded-full">
                 {displayStreams.length} 件
               </span>
             </div>
-            <svg className={`w-5 h-5 text-gray-500 transform transition-transform ${isFilterOpen ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className={`w-4 h-4 text-gray-500 transform transition-transform ${isFilterOpen ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
             </svg>
           </button>
 
           {isFilterOpen && (
-            <div className="p-3 sm:p-4 flex flex-col gap-3 border-t border-gray-200 max-h-[60vh] overflow-y-auto bg-white/80">
+            <div className="p-2 sm:p-2.5 flex flex-col gap-2 border-t border-gray-200 max-h-[60vh] overflow-y-auto bg-white/80">
               
               {/* 1行目: 検索バー ＋ タイトルのみ */}
-              <div className="flex items-center gap-2 w-full">
-                <div className="relative flex-1 min-w-[140px] h-[34px]">
-                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
+              <div className="flex items-center gap-1.5 w-full">
+                <div className="relative flex-1 min-w-[130px] h-[28px]">
+                  <Search className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400" size={13} />
                   <input
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="キーワード検索（スペース区切りでAND）..."
-                    className="w-full h-full pl-8 pr-7 text-xs sm:text-sm bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:border-pink-400 focus:bg-white transition-all text-gray-800 placeholder:text-gray-400 font-normal"
+                    placeholder="キーワード検索"
+                    className="w-full h-full pl-7 pr-6 text-[11px] sm:text-xs bg-gray-50 border border-gray-200 rounded-md focus:outline-none focus:border-pink-400 focus:bg-white transition-all text-gray-800 placeholder:text-gray-400 font-normal"
                   />
                   {searchQuery && (
                     <button
                       onClick={() => setSearchQuery("")}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-0.5 rounded-full"
+                      className="absolute right-1.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-0.5 rounded-full"
                     >
-                      <X size={12} />
+                      <X size={11} />
                     </button>
                   )}
                 </div>
@@ -175,9 +175,9 @@ export const StreamList = () => {
                 <button
                   type="button"
                   onClick={() => setIsTitleOnly(!isTitleOnly)}
-                  className={`flex-shrink-0 whitespace-nowrap px-2.5 h-[34px] rounded-lg text-xs font-bold transition-all border flex items-center justify-center ${
+                  className={`flex-shrink-0 whitespace-nowrap px-2 h-[28px] rounded-md text-[11px] sm:text-xs font-bold transition-all border flex items-center justify-center ${
                     isTitleOnly
-                      ? "bg-pink-500 border-pink-500 text-white shadow-xs"
+                      ? "bg-pink-500 border-pink-500 text-white shadow-2xs"
                       : "bg-gray-100 border-gray-200 text-gray-600 hover:bg-gray-200"
                   }`}
                   title="タイトルのみを対象に絞り込み"
@@ -187,16 +187,16 @@ export const StreamList = () => {
               </div>
 
               {/* 2行目: コントロール一式 */}
-              <div className="flex flex-wrap gap-2 items-center">
-                <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-md h-[34px]">
-                  <button onClick={() => setColumns(1)} className={`p-1.5 rounded transition-colors ${columns === 1 ? "bg-white shadow text-blue-600" : "text-gray-400 hover:text-gray-600"}`}>
-                    <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M4 6h16v2H4zm0 5h16v2H4zm0 5h16v2H4z"/></svg>
+              <div className="flex flex-wrap gap-1.5 items-center">
+                <div className="flex items-center gap-0.5 bg-gray-100 p-0.5 rounded-md h-[28px]">
+                  <button onClick={() => setColumns(1)} className={`p-1 rounded transition-colors ${columns === 1 ? "bg-white shadow-2xs text-blue-600" : "text-gray-400 hover:text-gray-600"}`}>
+                    <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M4 6h16v2H4zm0 5h16v2H4zm0 5h16v2H4z"/></svg>
                   </button>
-                  <button onClick={() => setColumns(2)} className={`p-1.5 rounded transition-colors ${columns === 2 ? "bg-white shadow text-blue-600" : "text-gray-400 hover:text-gray-600"}`}>
-                    <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M4 6h7v12H4zm9 0h7v12h-7z"/></svg>
+                  <button onClick={() => setColumns(2)} className={`p-1 rounded transition-colors ${columns === 2 ? "bg-white shadow-2xs text-blue-600" : "text-gray-400 hover:text-gray-600"}`}>
+                    <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M4 6h7v12H4zm9 0h7v12h-7z"/></svg>
                   </button>
-                  <button onClick={() => setColumns(4)} className={`p-1.5 rounded transition-colors ${columns === 4 ? "bg-white shadow text-blue-600" : "text-gray-400 hover:text-gray-600"}`}>
-                    <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M3 5h4v14H3zm5 0h4v14H8zm5 0h4v14h-4zm5 0h4v14h-4z"/></svg>
+                  <button onClick={() => setColumns(4)} className={`p-1 rounded transition-colors ${columns === 4 ? "bg-white shadow-2xs text-blue-600" : "text-gray-400 hover:text-gray-600"}`}>
+                    <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M3 5h4v14H3zm5 0h4v14H8zm5 0h4v14h-4zm5 0h4v14h-4z"/></svg>
                   </button>
                 </div>
 
@@ -220,14 +220,14 @@ export const StreamList = () => {
 
                 <button 
                   onClick={() => setIsMemberPopupOpen(true)}
-                  className="h-[34px] text-xs sm:text-sm px-3 bg-white border border-gray-300 rounded-md shadow-xs hover:bg-gray-50 flex items-center gap-1 font-normal text-gray-700 transition-colors flex-shrink-0"
+                  className="h-[28px] text-[11px] sm:text-xs px-2.5 bg-white border border-gray-300 rounded-md shadow-2xs hover:bg-gray-50 flex items-center gap-1 font-normal text-gray-700 transition-colors flex-shrink-0"
                 >
                   <span className="flex items-center">
-                    <svg className="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
+                    <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
                     メンバー
                   </span>
                   {isFilteringMembers && (
-                    <span className="w-2 h-2 rounded-full bg-blue-500 ml-0.5"></span>
+                    <span className="w-1.5 h-1.5 rounded-full bg-blue-500 ml-0.5"></span>
                   )}
                 </button>
 
@@ -240,7 +240,7 @@ export const StreamList = () => {
                 {isAnyFilterActive && (
                   <button 
                     onClick={handleResetFilters}
-                    className="h-[34px] text-xs sm:text-sm px-3 bg-gray-50 border border-gray-300 rounded-md shadow-xs hover:bg-gray-100 font-normal text-gray-600 transition-colors flex-shrink-0 flex items-center justify-center"
+                    className="h-[28px] text-[11px] sm:text-xs px-2.5 bg-gray-50 border border-gray-300 rounded-md shadow-2xs hover:bg-gray-100 font-normal text-gray-600 transition-colors flex-shrink-0 flex items-center justify-center"
                   >
                     リセット
                   </button>
@@ -251,7 +251,7 @@ export const StreamList = () => {
         </div>
       </div>
 
-      {/* 🌟 フローティング要素の高さ ＋ カード間の指定余白（18px）分下へ押し出し */}
+      {/* カードリスト押し出し */}
       <div style={{ paddingTop: `${filterHeight + 18}px` }}>
         <div className={`grid gap-3 sm:gap-4 ${gridClass}`}>
           {displayStreams.map((stream) => (
