@@ -81,6 +81,7 @@ export const useStreamFilters = (streams: StreamData[], records: Record<string, 
   const displayStreams = useMemo(() => {
     let result = [...streams];
 
+    // シーズン絞り込み
     if (filterSeason !== "all") {
       result = result.filter(s => {
         if (!s.season) return false;
@@ -91,10 +92,12 @@ export const useStreamFilters = (streams: StreamData[], records: Record<string, 
       });
     }
     
+    // 配信タイプ絞り込み（'mirapa_mc' にも対応）
     if (filterType !== "all") {
       result = result.filter(s => s.type === filterType);
     }
 
+    // 視聴済み / 未視聴絞り込み
     if (filterWatched !== "all") {
       result = result.filter(s => {
         const viewCount = records[s.id]?.viewCount || 0;
@@ -104,18 +107,22 @@ export const useStreamFilters = (streams: StreamData[], records: Record<string, 
       });
     }
 
+    // メンバー絞り込み（participants または cast 配列の両方を走査）
     const includes = MEMBERS.filter(m => memberFilters[m] === "include");
     const excludes = MEMBERS.filter(m => memberFilters[m] === "exclude");
 
     if (includes.length > 0 || excludes.length > 0) {
       result = result.filter(s => {
-        const participants = s.participants || "";
+        const castStr = Array.isArray((s as any).cast) ? (s as any).cast.join(" ") : "";
+        const participants = `${s.participants || ""} ${castStr}`;
+
         if (!includes.every(m => participants.includes(m))) return false;
         if (excludes.some(m => participants.includes(m))) return false;
         return true;
       });
     }
 
+    // ソート処理
     result.sort((a, b) => {
       const is102A = a.season === "102期";
       const is102B = b.season === "102期";

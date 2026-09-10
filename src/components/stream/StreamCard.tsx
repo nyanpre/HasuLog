@@ -20,12 +20,12 @@ export const StreamCard = ({ stream, columns, viewCount, onClick }: Props) => {
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [actionMode, setActionMode] = useState<'increase' | 'decrease'>('increase');
 
-  // 🌟 判定ロジック
+  // 判定ロジック
   const isExUser = Boolean(currentUser && userData?.exMode === true);
   const isOfficialStream = stream.is_official !== false && (stream.is_official as any) !== "false";
   const isRestrictedType = stream.type === "fes_live" || stream.type === "story";
 
-  // 🌟 「Fes×LIVE」または「活動記録」の「非公式動画」は、exModeユーザー以外サムネイル非表示
+  // 「Fes×LIVE」または「活動記録」の「非公式動画」は、exModeユーザー以外サムネイル非表示
   const shouldShowThumbnail = Boolean(stream.thumbnailUrl) &&
     (!(isRestrictedType && !isOfficialStream) || isExUser);
 
@@ -41,10 +41,8 @@ export const StreamCard = ({ stream, columns, viewCount, onClick }: Props) => {
     if (currentUser) {
       try {
         if (actionMode === 'increase') {
-          // 🌟 第4引数(おすすめ判定)はfalse、第5引数に動画種別(stream.type)を渡す
           await addWatchRecord(currentUser.uid, stream.id, stream.title, false, stream.type);
         } else {
-          // 🌟 第4引数に動画種別(stream.type)を渡す
           await removeWatchRecord(currentUser.uid, stream.id, stream.title, stream.type);
         }
       } catch (error) {
@@ -55,15 +53,20 @@ export const StreamCard = ({ stream, columns, viewCount, onClick }: Props) => {
 
   const getBadgeInfo = () => {
     if (stream.type === "with_meets") {
-      return { text: "MEETS", bg: "bg-pink-500" };
+      return { text: "MEETS", bg: "bg-pink-500 text-white" };
     }
     if (stream.type === "fes_live") {
-      return { text: "Fes×LIVE", bg: "bg-emerald-500" };
+      return { text: "Fes×LIVE", bg: "bg-emerald-500 text-white" };
     }
     if (stream.type === "story") {
-      return { text: "活動記録", bg: "bg-amber-500" };
+      // 🌟 濃いめのオレンジ
+      return { text: "活動記録", bg: "bg-orange-600 text-white" };
     }
-    return { text: "STATION", bg: "bg-blue-500" };
+    if (stream.type === "mirapa_mc") {
+      // 🌟 イエロー背景 ＋ 白文字
+      return { text: "マイクラ", bg: "bg-yellow-500 text-white font-bold drop-shadow-xs" };
+    }
+    return { text: "STATION", bg: "bg-blue-500 text-white" };
   };
 
   const badge = getBadgeInfo();
@@ -89,7 +92,7 @@ export const StreamCard = ({ stream, columns, viewCount, onClick }: Props) => {
             <span>No Image</span>
           </div>
         )}
-        <span className={`absolute top-1 left-1 sm:top-2 sm:left-2 text-white px-1.5 py-0.5 rounded text-[9px] sm:text-[10px] font-bold ${badge.bg}`}>
+        <span className={`absolute top-1 left-1 sm:top-2 sm:left-2 px-1.5 py-0.5 rounded text-[9px] sm:text-[10px] shadow-xs ${badge.bg}`}>
           {badge.text}
         </span>
       </div>

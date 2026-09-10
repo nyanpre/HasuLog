@@ -12,7 +12,7 @@ export const StreamList = () => {
   const { records, updateRecord } = useUserRecords();
   const { streams, isLoading: loading, error } = useStreams();
 
-  // 🌟 ステップ1で作成したカスタムフックからロジックをすべて呼び出す
+  // 🌟 カスタムフックからロジックを呼び出し
   const {
     columns, setColumns,
     isFilterOpen, setIsFilterOpen,
@@ -85,6 +85,7 @@ export const StreamList = () => {
                 <option value="with_station">With×STATION</option>
                 <option value="fes_live">Fes×LIVE</option>
                 <option value="story">活動記録</option>
+                <option value="mirapa_mc">みらぱマイクラ</option>
               </select>
 
               <select value={filterWatched} onChange={(e) => setFilterWatched(e.target.value)} className="text-xs sm:text-sm py-1.5 pl-2 pr-8 border-gray-300 rounded-md shadow-sm focus:border-blue-300 focus:ring-0">

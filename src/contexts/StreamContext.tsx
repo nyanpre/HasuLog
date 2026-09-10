@@ -3,11 +3,12 @@ import { createContext, useContext, useState, useEffect } from 'react';
 import type { ReactNode } from 'react';
 import type { StreamData } from '../types';
 
-// 🌟 JSONデータをフロントエンドに直接インポート！
+// JSONデータをフロントエンドにインポート
 import withmeetsData from '../data/withmeets_wiki_data.json';
 import withstationData from '../data/withstation_wiki_data.json';
 import fesliveData from '../data/feslive_wiki_data.json';
-import storyData from '../data/story_wiki_data.json'; // 🌟 追加: 活動記録データ
+import storyData from '../data/story_wiki_data.json';
+import mirapaMcData from '../data/mirapa_minecraft.json';
 
 type StreamContextType = {
   streams: StreamData[];
@@ -24,12 +25,33 @@ export const StreamProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     try {
-      // 1. 4つのJSONデータを合体させる (🌟 storyData を追加)
-      const allStreams = [
+      // 🌟 StreamData 型を満たすようにマッピング
+      const formattedMirapaMc: StreamData[] = (mirapaMcData as any[]).map((v) => {
+        const videoUrl = v.youtubeUrl || (v.videoId ? `https://www.youtube.com/watch?v=${v.videoId}` : '');
+
+        return {
+          id: v.id || `mirapa-mc-${v.videoId}`,
+          title: v.title,
+          date: v.publishedDate || v.date || '',
+          type: 'mirapa_mc',
+          season: v.season || '104',
+          cast: ['藤島慈', '安養寺姫芽'],
+          participants: '藤島慈、安養寺姫芽', // 必須プロパティ
+          description: v.description || '',
+          url: videoUrl,
+          youtubeUrl: videoUrl,             // 必須プロパティ
+          thumbnailUrl: v.thumbnailUrl || '',
+          is_official: true,
+        };
+      });
+
+      // 1. 全てのJSONデータを合体
+      const allStreams: StreamData[] = [
         ...(withmeetsData as StreamData[]),
         ...(withstationData as StreamData[]),
         ...(fesliveData as StreamData[]),
-        ...(storyData as StreamData[])
+        ...(storyData as StreamData[]),
+        ...formattedMirapaMc,
       ];
       
       // 2. 日付の新しい順（降順）に並び替え
@@ -45,7 +67,7 @@ export const StreamProvider = ({ children }: { children: ReactNode }) => {
       console.error("データの読み込みに失敗しました:", err);
       setError("データの読み込みに失敗しました。");
     } finally {
-      setIsLoading(false); // ロード完了
+      setIsLoading(false);
     }
   }, []);
 
