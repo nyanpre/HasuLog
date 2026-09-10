@@ -33,70 +33,88 @@ export default function Home() {
     'grid-cols-4 gap-2';
 
   return (
-    <div className="p-4 relative pb-20">
-      <div className="flex justify-between items-center mb-4 bg-white p-2 rounded-lg shadow-sm">
-        <div className="flex items-center space-x-2">
-          <span className="text-sm font-bold text-gray-700">コンテンツ一覧</span>
-          <button
-            onClick={() => setSortOrder(prev => prev === 'desc' ? 'asc' : 'desc')}
-            className="flex items-center space-x-1 text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded active:scale-95 transition-transform"
-          >
-            <ArrowUpDown size={14} />
-            <span>{sortOrder === 'desc' ? '新しい順' : '古い順'}</span>
-          </button>
-        </div>
+    <div className="relative pb-20">
+      {/* 🌟 ヘッダー直下に密着して固定される操作バー（背景色を敷いて動画の潜り込みをカット） */}
+      <div className="sticky top-0 z-20 bg-gray-50 px-4 pt-3 pb-2 border-b border-gray-200/80">
+        <div className="flex justify-between items-center bg-white p-2 rounded-lg shadow-sm border border-gray-100">
+          <div className="flex items-center space-x-2">
+            <span className="text-sm font-bold text-gray-700">コンテンツ一覧</span>
+            <button
+              onClick={() => setSortOrder(prev => prev === 'desc' ? 'asc' : 'desc')}
+              className="flex items-center space-x-1 text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded active:scale-95 transition-transform cursor-pointer"
+            >
+              <ArrowUpDown size={14} />
+              <span>{sortOrder === 'desc' ? '新しい順' : '古い順'}</span>
+            </button>
+          </div>
 
-        <div className="flex items-center space-x-2">
-          {/* 検索モーダル起動ボタン */}
-          <button
-            onClick={() => setIsSearchOpen(true)}
-            className="flex items-center gap-1 text-xs font-bold text-gray-600 bg-gray-100 hover:bg-pink-50 hover:text-pink-600 px-2.5 py-1.5 rounded-md transition-colors"
-            title="キーワード検索"
-          >
-            <Search size={15} />
-            <span className="hidden sm:inline">検索</span>
-          </button>
+          <div className="flex items-center space-x-2">
+            {/* 検索モーダル起動ボタン */}
+            <button
+              onClick={() => setIsSearchOpen(true)}
+              className="flex items-center gap-1 text-xs font-bold text-gray-600 bg-gray-100 hover:bg-pink-50 hover:text-pink-600 px-2.5 py-1.5 rounded-md transition-colors cursor-pointer"
+              title="キーワード検索"
+            >
+              <Search size={15} />
+              <span className="hidden sm:inline">検索</span>
+            </button>
 
-          <div className="h-4 w-[1px] bg-gray-200" />
+            <div className="h-4 w-[1px] bg-gray-200" />
 
-          <button onClick={() => setLayout(1)} className={`p-1.5 rounded ${layout === 1 ? 'bg-pink-100 text-pink-600' : 'text-gray-400'}`}>
-            <LayoutList size={20} />
-          </button>
-          <button onClick={() => setLayout(2)} className={`p-1.5 rounded ${layout === 2 ? 'bg-pink-100 text-pink-600' : 'text-gray-400'}`}>
-            <Grid2X2 size={20} />
-          </button>
-          <button onClick={() => setLayout(4)} className={`p-1.5 rounded ${layout === 4 ? 'bg-pink-100 text-pink-600' : 'text-gray-400'}`}>
-            <Grid3X3 size={20} />
-          </button>
+            <button 
+              onClick={() => setLayout(1)} 
+              className={`p-1.5 rounded cursor-pointer ${layout === 1 ? 'bg-pink-100 text-pink-600' : 'text-gray-400 hover:text-gray-600'}`}
+              title="1列表示"
+            >
+              <LayoutList size={20} />
+            </button>
+            <button 
+              onClick={() => setLayout(2)} 
+              className={`p-1.5 rounded cursor-pointer ${layout === 2 ? 'bg-pink-100 text-pink-600' : 'text-gray-400 hover:text-gray-600'}`}
+              title="2列表示"
+            >
+              <Grid2X2 size={20} />
+            </button>
+            <button 
+              onClick={() => setLayout(4)} 
+              className={`p-1.5 rounded cursor-pointer ${layout === 4 ? 'bg-pink-100 text-pink-600' : 'text-gray-400 hover:text-gray-600'}`}
+              title="4列表示"
+            >
+              <Grid3X3 size={20} />
+            </button>
+          </div>
         </div>
       </div>
 
-      {isLoading ? (
-        <div className="flex justify-center items-center py-20">
-          <Loader2 className="animate-spin text-pink-500" size={32} />
-        </div>
-      ) : streams.length === 0 ? (
-        <div className="text-center py-20 text-gray-500 text-sm">
-          データがありません
-        </div>
-      ) : (
-        <div className={`grid ${gridClass}`}>
-          {sortedStreams.map((stream) => {
-            const currentRecord = records[stream.id];
-            const currentViewCount = currentRecord?.viewCount || 0;
+      {/* コンテンツ本体エリア */}
+      <div className="p-4 pt-3">
+        {isLoading ? (
+          <div className="flex justify-center items-center py-20">
+            <Loader2 className="animate-spin text-pink-500" size={32} />
+          </div>
+        ) : streams.length === 0 ? (
+          <div className="text-center py-20 text-gray-500 text-sm">
+            データがありません
+          </div>
+        ) : (
+          <div className={`grid ${gridClass}`}>
+            {sortedStreams.map((stream) => {
+              const currentRecord = records[stream.id];
+              const currentViewCount = currentRecord?.viewCount || 0;
 
-            return (
-              <StreamCard
-                key={stream.id}
-                stream={stream}
-                columns={layout}
-                viewCount={currentViewCount}
-                onClick={() => setSelectedStream(stream)}
-              />
-            );
-          })}
-        </div>
-      )}
+              return (
+                <StreamCard
+                  key={stream.id}
+                  stream={stream}
+                  columns={layout}
+                  viewCount={currentViewCount}
+                  onClick={() => setSelectedStream(stream)}
+                />
+              );
+            })}
+          </div>
+        )}
+      </div>
 
       {/* 検索モーダル */}
       <StreamSearchModal
