@@ -9,7 +9,6 @@ import { StreamCard } from "./StreamCard";
 import { MemberFilterModal } from "./MemberFilterModal";
 import { StreamDetailModal } from "./StreamDetailModal";
 
-// 選択中のテキスト幅にだけ完全に一致するよう絶対配置を活用したSelect（h-[28px]に微縮小）
 const DynamicSelect = ({
   value,
   onChange,
@@ -70,7 +69,7 @@ export const StreamList = () => {
   const [selectedStream, setSelectedStream] = useState<StreamData | null>(null);
 
   const floatingRef = useRef<HTMLDivElement>(null);
-  const [filterHeight, setFilterHeight] = useState<number>(110);
+  const [filterHeight, setFilterHeight] = useState<number>(90);
 
   useEffect(() => {
     if (!floatingRef.current) return;
@@ -124,15 +123,16 @@ export const StreamList = () => {
   return (
     <div className="max-w-6xl mx-auto px-3 md:px-6 pb-24 relative">
       
-      {/* フローティングバー */}
+      {/* 🌟 ヘッダー(z-10)よりも下層(z-[5])に配置し、少し上(top-[46px])から潜り込ませる */}
       <div 
         ref={floatingRef}
-        className="fixed top-[49px] left-0 right-0 z-30 max-w-6xl mx-auto px-3 md:px-6 pt-1.5 pointer-events-none"
+        className="fixed top-[calc(46px+env(safe-area-inset-top,0px))] left-0 right-0 z-[5] max-w-6xl mx-auto px-3 md:px-6 pointer-events-none"
       >
-        <div className="bg-white/95 backdrop-blur-md rounded-xl shadow-md border border-gray-200/90 overflow-hidden pointer-events-auto transition-all">
+        <div className="bg-white/95 backdrop-blur-md rounded-b-xl shadow-md border-x border-b border-gray-200/90 overflow-hidden pointer-events-auto transition-all pt-1">
+          
           <button 
             onClick={() => setIsFilterOpen(!isFilterOpen)}
-            className="w-full flex items-center justify-between py-2 px-3 bg-gray-50/90 hover:bg-gray-100/90 transition-colors"
+            className="w-full flex items-center justify-between py-2 px-3 bg-gray-50 hover:bg-gray-100 transition-colors border-b border-gray-200/60"
           >
             <div className="flex items-center gap-1.5">
               <span className="text-xs sm:text-sm font-bold text-gray-700 flex items-center">
@@ -149,7 +149,7 @@ export const StreamList = () => {
           </button>
 
           {isFilterOpen && (
-            <div className="p-2 sm:p-2.5 flex flex-col gap-2 border-t border-gray-200 max-h-[60vh] overflow-y-auto bg-white/80">
+            <div className="p-2 sm:p-2.5 flex flex-col gap-2 max-h-[60vh] overflow-y-auto bg-white/95">
               
               {/* 1行目: 検索バー ＋ タイトルのみ */}
               <div className="flex items-center gap-1.5 w-full">
@@ -159,7 +159,7 @@ export const StreamList = () => {
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="キーワード検索"
+                    placeholder="キーワード検索（スペース区切りでAND）..."
                     className="w-full h-full pl-7 pr-6 text-[11px] sm:text-xs bg-gray-50 border border-gray-200 rounded-md focus:outline-none focus:border-pink-400 focus:bg-white transition-all text-gray-800 placeholder:text-gray-400 font-normal"
                   />
                   {searchQuery && (
@@ -186,7 +186,7 @@ export const StreamList = () => {
                 </button>
               </div>
 
-              {/* 2行目: コントロール一式 */}
+              {/* 2行目: 各種コントロール */}
               <div className="flex flex-wrap gap-1.5 items-center">
                 <div className="flex items-center gap-0.5 bg-gray-100 p-0.5 rounded-md h-[28px]">
                   <button onClick={() => setColumns(1)} className={`p-1 rounded transition-colors ${columns === 1 ? "bg-white shadow-2xs text-blue-600" : "text-gray-400 hover:text-gray-600"}`}>
@@ -251,7 +251,7 @@ export const StreamList = () => {
         </div>
       </div>
 
-      {/* カードリスト押し出し */}
+      {/* フィルター高さ ＋ 余白（18px）分下へ押し出し */}
       <div style={{ paddingTop: `${filterHeight + 18}px` }}>
         <div className={`grid gap-3 sm:gap-4 ${gridClass}`}>
           {displayStreams.map((stream) => (
