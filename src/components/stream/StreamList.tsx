@@ -106,7 +106,7 @@ export const StreamList = () => {
     { value: "with_station", label: "With×STATION" },
     { value: "fes_live", label: "Fes×LIVE" },
     { value: "story", label: "活動記録" },
-    { value: "mirapa_mc", label: "みらぱマイクラ" },
+    { value: "mirapa_mc", label: "みらくらマイクラ" },
   ];
 
   const watchedOptions = [
@@ -159,7 +159,7 @@ export const StreamList = () => {
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="キーワード検索（スペース区切りでAND）..."
+                    placeholder="キーワード検索"
                     className="w-full h-full pl-7 pr-6 text-[11px] sm:text-xs bg-gray-50 border border-gray-200 rounded-md focus:outline-none focus:border-pink-400 focus:bg-white transition-all text-gray-800 placeholder:text-gray-400 font-normal"
                   />
                   {searchQuery && (
