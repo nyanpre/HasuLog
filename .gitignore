@@ -151,4 +151,5 @@ __pycache__/
 *.pyc
 
 # Scraped data
-backend/data/
+backend/data/public/archives/*.gz
+public/archives/*.html

@@ -16,34 +16,26 @@ export const ArchiveViewer = ({ gzUrl }: Props) => {
     async function fetchAndUnzip() {
       try {
         const response = await fetch(gzUrl);
-        if (!response.ok) throw new Error(`HTTPエラー: ${response.status}`);
+        if (!response.ok) {
+          throw new Error(`HTTPエラー: ${response.status} (Storageからの取得に失敗しました)`);
+        }
 
-        // 🌟 修正: Streamで直接処理せず、一度バッファとして読み込む
         const buffer = await response.arrayBuffer();
         const view = new Uint8Array(buffer);
         let htmlBlob: Blob;
 
-        // Gzipのマジックナンバー (1F 8B) を確認して本当に圧縮されているか判定
+        // Gzipのマジックナンバー (1F 8B) の確認
         if (view.length >= 2 && view[0] === 0x1f && view[1] === 0x8b) {
-          // Gzip形式なので展開する
+          // ブラウザ側で明示的に解凍
           const stream = new Blob([buffer]).stream();
           const decompressedStream = stream.pipeThrough(new DecompressionStream('gzip'));
           const rawBlob = await new Response(decompressedStream).blob();
-          htmlBlob = new Blob([rawBlob], { type: 'text/html' });
+          htmlBlob = new Blob([rawBlob], { type: 'text/html;charset=utf-8' });
         } else {
-          // 開発サーバーによる自動解凍、またはファイルが存在しない(404)場合
-          const textPreview = new TextDecoder().decode(buffer.slice(0, 1000));
-          
-          // ViteのSPAフォールバック (ファイルが無い時に index.html が返る現象) を検知
-          if (textPreview.includes('<div id="root">') || textPreview.includes('src="/src/main.tsx"')) {
-            throw new Error('アーカイブファイルが見つかりません。');
-          }
-          
-          // 既に解凍されたHTMLデータとしてそのまま使用する
-          htmlBlob = new Blob([buffer], { type: 'text/html' });
+          // ブラウザやCDNが既に自動解凍してくれたプレーンなHTMLの場合
+          htmlBlob = new Blob([buffer], { type: 'text/html;charset=utf-8' });
         }
         
-        // iframeで表示可能なBlob URLを生成
         currentObjectUrl = URL.createObjectURL(htmlBlob);
         setHtmlUrl(currentObjectUrl);
       } catch (err: any) {
@@ -53,12 +45,11 @@ export const ArchiveViewer = ({ gzUrl }: Props) => {
     }
     
     if (gzUrl) {
-        setHtmlUrl(null);
-        setError(null);
-        fetchAndUnzip();
+      setHtmlUrl(null);
+      setError(null);
+      fetchAndUnzip();
     }
 
-    // クリーンアップ処理
     return () => {
       if (currentObjectUrl) {
         URL.revokeObjectURL(currentObjectUrl);
@@ -68,8 +59,9 @@ export const ArchiveViewer = ({ gzUrl }: Props) => {
 
   if (error) {
     return (
-      <div className="absolute inset-0 z-10 flex items-center justify-center bg-white text-gray-500 font-bold text-sm">
-        {error}
+      <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-white p-6 text-center">
+        <p className="text-red-500 font-bold text-sm mb-1">エラーが発生しました</p>
+        <p className="text-gray-400 text-xs">{error}</p>
       </div>
     );
   }
@@ -78,7 +70,7 @@ export const ArchiveViewer = ({ gzUrl }: Props) => {
     return (
       <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-gray-100 gap-3">
         <Loader2 className="w-8 h-8 animate-spin text-pink-500" />
-        <span className="text-gray-400 text-xs font-bold animate-pulse">アーカイブを読み込み中...</span>
+        <span className="text-gray-400 text-xs font-bold animate-pulse">Storageからアーカイブを展開中...</span>
       </div>
     );
   }
