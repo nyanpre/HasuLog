@@ -15,7 +15,6 @@ export default function Layout({ children }: LayoutProps) {
   const [isHelpModalOpen, setIsHelpModalOpen] = useState(false);
   const { currentUser } = useAuth();
   
-  // 初期値を localStorage から同期的に取得
   const [, setIsExMode] = useState(() => {
     return localStorage.getItem('hasulog_isExMode') === 'true';
   });
@@ -49,24 +48,26 @@ export default function Layout({ children }: LayoutProps) {
 
   return (
     <div className="flex flex-col min-h-screen bg-gray-50">
-      <header className="bg-white shadow-sm sticky top-0 z-10 pt-safe-top">
-        <div className="relative px-4 py-3 flex justify-center items-center">
+      {/* 画面上部ヘッダー（固定） */}
+      <header className="bg-white shadow-sm fixed top-0 left-0 right-0 z-30 pt-safe-top">
+        <div className="relative px-4 py-3 flex justify-center items-center h-[52px]">
           <h1 className="text-xl font-bold text-pink-500 tracking-wider">HasuLog</h1>
           <button 
             onClick={() => setIsHelpModalOpen(true)}
-            className="absolute right-4 text-xs font-bold text-gray-400 hover:text-gray-700 transition-colors"
+            className="absolute right-4 text-xs font-bold text-gray-400 hover:text-gray-700 transition-colors cursor-pointer"
           >
             使い方
           </button>
         </div>
       </header>
 
-      <main className="flex-1 overflow-y-auto pb-24">
+      {/* 🌟 他ページも素直にスクロールできるよう標準的なコンテナに復元 */}
+      <main className="flex-1 pt-[52px] pb-24">
         {children || <Outlet />}
       </main>
 
-      <nav className="bg-white border-t fixed bottom-0 w-full pb-safe-bottom z-10">
-        {/* 常時6列で「関連」を表示 */}
+      {/* 画面下部ナビゲーション（固定） */}
+      <nav className="bg-white border-t fixed bottom-0 w-full pb-safe-bottom z-30">
         <div className="grid grid-cols-6 items-center h-[72px] pb-2 w-full px-[14px]">
           <Link to="/" className="flex flex-col items-center justify-center text-gray-500 hover:text-pink-500 transition-colors min-w-0">
             <Home size={22} className="flex-shrink-0" />

@@ -34,60 +34,61 @@ export default function Home() {
 
   return (
     <div className="relative pb-20">
-      {/* 🌟 ヘッダー直下に密着して固定される操作バー（背景色を敷いて動画の潜り込みをカット） */}
-      <div className="sticky top-0 z-20 bg-gray-50 px-4 pt-3 pb-2 border-b border-gray-200/80">
-        <div className="flex justify-between items-center bg-white p-2 rounded-lg shadow-sm border border-gray-100">
-          <div className="flex items-center space-x-2">
-            <span className="text-sm font-bold text-gray-700">コンテンツ一覧</span>
-            <button
-              onClick={() => setSortOrder(prev => prev === 'desc' ? 'asc' : 'desc')}
-              className="flex items-center space-x-1 text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded active:scale-95 transition-transform cursor-pointer"
-            >
-              <ArrowUpDown size={14} />
-              <span>{sortOrder === 'desc' ? '新しい順' : '古い順'}</span>
-            </button>
-          </div>
+      {/* 🌟 ヘッダー(52px)の真下に完全固定(fixed)。スクロールしても絶対に動かない */}
+      <div className="fixed top-[52px] left-0 right-0 z-20 bg-gray-50 border-b border-gray-200/80 shadow-xs">
+        <div className="max-w-6xl mx-auto px-4 py-2.5">
+          <div className="flex justify-between items-center bg-white p-2 rounded-lg shadow-sm border border-gray-100">
+            <div className="flex items-center space-x-2">
+              <span className="text-sm font-bold text-gray-700">コンテンツ一覧</span>
+              <button
+                onClick={() => setSortOrder(prev => prev === 'desc' ? 'asc' : 'desc')}
+                className="flex items-center space-x-1 text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded active:scale-95 transition-transform cursor-pointer"
+              >
+                <ArrowUpDown size={14} />
+                <span>{sortOrder === 'desc' ? '新しい順' : '古い順'}</span>
+              </button>
+            </div>
 
-          <div className="flex items-center space-x-2">
-            {/* 検索モーダル起動ボタン */}
-            <button
-              onClick={() => setIsSearchOpen(true)}
-              className="flex items-center gap-1 text-xs font-bold text-gray-600 bg-gray-100 hover:bg-pink-50 hover:text-pink-600 px-2.5 py-1.5 rounded-md transition-colors cursor-pointer"
-              title="キーワード検索"
-            >
-              <Search size={15} />
-              <span className="hidden sm:inline">検索</span>
-            </button>
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={() => setIsSearchOpen(true)}
+                className="flex items-center gap-1 text-xs font-bold text-gray-600 bg-gray-100 hover:bg-pink-50 hover:text-pink-600 px-2.5 py-1.5 rounded-md transition-colors cursor-pointer"
+                title="キーワード検索"
+              >
+                <Search size={15} />
+                <span className="hidden sm:inline">検索</span>
+              </button>
 
-            <div className="h-4 w-[1px] bg-gray-200" />
+              <div className="h-4 w-[1px] bg-gray-200" />
 
-            <button 
-              onClick={() => setLayout(1)} 
-              className={`p-1.5 rounded cursor-pointer ${layout === 1 ? 'bg-pink-100 text-pink-600' : 'text-gray-400 hover:text-gray-600'}`}
-              title="1列表示"
-            >
-              <LayoutList size={20} />
-            </button>
-            <button 
-              onClick={() => setLayout(2)} 
-              className={`p-1.5 rounded cursor-pointer ${layout === 2 ? 'bg-pink-100 text-pink-600' : 'text-gray-400 hover:text-gray-600'}`}
-              title="2列表示"
-            >
-              <Grid2X2 size={20} />
-            </button>
-            <button 
-              onClick={() => setLayout(4)} 
-              className={`p-1.5 rounded cursor-pointer ${layout === 4 ? 'bg-pink-100 text-pink-600' : 'text-gray-400 hover:text-gray-600'}`}
-              title="4列表示"
-            >
-              <Grid3X3 size={20} />
-            </button>
+              <button 
+                onClick={() => setLayout(1)} 
+                className={`p-1.5 rounded cursor-pointer ${layout === 1 ? 'bg-pink-100 text-pink-600' : 'text-gray-400 hover:text-gray-600'}`}
+                title="1列表示"
+              >
+                <LayoutList size={20} />
+              </button>
+              <button 
+                onClick={() => setLayout(2)} 
+                className={`p-1.5 rounded cursor-pointer ${layout === 2 ? 'bg-pink-100 text-pink-600' : 'text-gray-400 hover:text-gray-600'}`}
+                title="2列表示"
+              >
+                <Grid2X2 size={20} />
+              </button>
+              <button 
+                onClick={() => setLayout(4)} 
+                className={`p-1.5 rounded cursor-pointer ${layout === 4 ? 'bg-pink-100 text-pink-600' : 'text-gray-400 hover:text-gray-600'}`}
+                title="4列表示"
+              >
+                <Grid3X3 size={20} />
+              </button>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* コンテンツ本体エリア */}
-      <div className="p-4 pt-3">
+      {/* 🌟 固定バーの高さ分（約64px）トップ余白を確保し、動画カード群をその下から流す */}
+      <div className="max-w-6xl mx-auto px-4 pt-[68px]">
         {isLoading ? (
           <div className="flex justify-center items-center py-20">
             <Loader2 className="animate-spin text-pink-500" size={32} />
@@ -116,7 +117,6 @@ export default function Home() {
         )}
       </div>
 
-      {/* 検索モーダル */}
       <StreamSearchModal
         isOpen={isSearchOpen}
         onClose={() => setIsSearchOpen(false)}
