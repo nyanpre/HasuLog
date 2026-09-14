@@ -24,54 +24,81 @@ JSON_FILES = [
     "story_wiki_data.json"
 ]
 
-def load_all_json_data():
-    all_streams = []
+
+def extract_minimal_payload(stream: dict) -> tuple[str, dict] | tuple[None, None]:
+    """
+    descriptionなどの長文を除外し、動画ID・タイトル・表示・集計に必要な
+    最低限のフィールドのみを抽出する
+    """
+    stream_id = stream.get("id")
+    if not stream_id:
+        return None, None
+
+    # 最低限必要な主要フィールド
+    payload = {
+        "id": stream_id,
+        "title": stream.get("title", ""),
+    }
+
+    # システムやカード描画に必要な最低限の属性のみ追加（存在する場合のみ）
+    optional_fields = [
+        "season",         # 例: '103', '104'
+        "type",           # 例: 'with_meets', 'story', 'fes_live'
+        "date",           # 例: '2023-04-15'
+        "youtubeUrl",     # YouTube URL
+        "thumbnailUrl",   # サムネイル
+        "participants",   # 参加メンバー
+        "is_official",    # 公式フラグ
+    ]
+
+    for field in optional_fields:
+        if field in stream and stream[field] is not None:
+            payload[field] = stream[field]
+
+    return stream_id, payload
+
+
+def load_all_json_data() -> dict[str, dict]:
+    """対象JSONから最低限のデータを抽出し、ID単位で重複をまとめる"""
+    streams_map = {}
+    
     for filename in JSON_FILES:
         filepath = os.path.join(DATA_DIR, filename)
         if os.path.exists(filepath):
             with open(filepath, "r", encoding="utf-8") as f:
                 data = json.load(f)
-                all_streams.extend(data)
-                print(f"📄 読み込み完了: {filename} ({len(data)} 件)")
+                loaded_count = 0
+                for item in data:
+                    if not isinstance(item, dict):
+                        continue
+                    stream_id, payload = extract_minimal_payload(item)
+                    if stream_id:
+                        streams_map[stream_id] = payload
+                        loaded_count += 1
+                print(f"📄 読み込み完了: {filename} ({loaded_count} 件 抽出)")
         else:
             print(f"⚠️ スキップ（見つかりません）: {filename}")
-    return all_streams
+            
+    return streams_map
+
 
 def upload_streams():
-    streams = load_all_json_data()
-    print(f"\n🚀 合計 {len(streams)} 件のデータをFirestore（streamsコレクション）に送信・更新します...")
+    streams_map = load_all_json_data()
+    total_streams = len(streams_map)
+    print(f"\n🚀 合計 {total_streams} 件（最低限データ）をFirestore（streamsコレクション）に送信・更新します...")
+
+    if total_streams == 0:
+        print("送信対象のデータがありませんでした。")
+        return
 
     batch = db.batch()
     batch_count = 0
     total_uploaded = 0
 
-    for stream in streams:
-        stream_id = stream.get("id")
-        if not stream_id:
-            continue
-
-        # 送信するデータ構造を整理（不要なNoneを除去）
-        stream_doc_data = {
-            "id": stream_id,
-            "season": stream.get("season", ""),
-            "type": stream.get("type", ""),
-            "date": stream.get("date", ""),
-            "title": stream.get("title", ""),
-            "participants": stream.get("participants", ""),
-            "youtubeUrl": stream.get("youtubeUrl", ""),
-            "thumbnailUrl": stream.get("thumbnailUrl", ""),
-            "description": stream.get("description", ""),
-            "is_official": stream.get("is_official", True)
-        }
-
-        # 任意フィールドの追加
-        if "raw_title_node" in stream:
-            stream_doc_data["raw_title_node"] = stream["raw_title_node"]
-        if "extraYoutubeUrls" in stream:
-            stream_doc_data["extraYoutubeUrls"] = stream["extraYoutubeUrls"]
-
+    for stream_id, stream_doc_data in streams_map.items():
         doc_ref = db.collection("streams").document(stream_id)
-        # merge=True で既存フィールドを保持しつつ更新・追加
+        
+        # merge=True で既存の視聴回数（viewCount等）を保持したままメタデータのみ更新・新規追加
         batch.set(doc_ref, stream_doc_data, merge=True)
         batch_count += 1
         total_uploaded += 1
@@ -79,14 +106,15 @@ def upload_streams():
         # Firestoreのバッチ上限（500件）ごとにコミット
         if batch_count >= 450:
             batch.commit()
-            print(f"⏳ {total_uploaded} / {len(streams)} 件 送信完了...")
+            print(f"⏳ {total_uploaded} / {total_streams} 件 送信完了...")
             batch = db.batch()
             batch_count = 0
 
     if batch_count > 0:
         batch.commit()
 
-    print(f"\n🎉 全 {total_uploaded} 件のマスターデータの送信・更新が完了しました！")
+    print(f"\n🎉 全 {total_uploaded} 件のデータ送信・更新が完了しました！")
+
 
 if __name__ == "__main__":
     upload_streams()

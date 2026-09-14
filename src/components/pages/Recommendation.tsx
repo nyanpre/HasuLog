@@ -294,7 +294,7 @@ export default function Recommendation() {
           record={selectedStream ? (records[selectedStream.id] || null) : null}
           onClose={() => setSelectedStream(null)} 
           onUpdateRecord={updateRecord}
-          isRecommended={true}
+          isRecommended={false}
         />
       )}
     </div>
