@@ -76,7 +76,7 @@ export default function Layout({ children }: LayoutProps) {
 
           <Link to="/recommendation" className="flex flex-col items-center justify-center text-gray-500 hover:text-pink-500 transition-colors min-w-0">
             <Star size={22} className="flex-shrink-0" />
-            <span className="text-[10px] mt-1 truncate">おすすめ</span>
+            <span className="text-[10px] mt-1 truncate">おすすめ/選ぶ</span>
           </Link>
 
           <Link to="/related" className="flex flex-col items-center justify-center text-gray-500 hover:text-pink-500 transition-colors min-w-0">

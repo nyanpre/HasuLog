@@ -1,4 +1,4 @@
-// src/components/related/VideoCard.tsx
+// src/components/related/VideoCard.tsx 修正後
 import { useState } from "react";
 import { ExternalLink, X } from "lucide-react";
 import type { ContentItem } from "./types";
@@ -19,12 +19,13 @@ export const VideoCard = ({ item, columns }: Props) => {
   };
 
   // カテゴリ・タイプからバッジのテキストと色を動的に決定
-  const isMirapa = item.category?.includes("みらぱ") || (item as any).type === "みらぱラジオ";
+  const isMirapa = item.category?.includes("みらぱ") || (item as any).type === "mirapa_radio" || (item as any).type === "みらぱラジオ";
   const isMembership = item.category?.includes("メンバー") || (item as any).type === "メンバー限定";
   const isIntro = item.category?.includes("自己紹介") || (item as any).type === "自己紹介";
 
+  // 🌟 みらぱラジオの場合は「ラジオ」を表示
   const badgeText = isMirapa 
-    ? (item.subCategory || "みらぱ") 
+    ? "ラジオ" 
     : isMembership 
     ? "メン限" 
     : isIntro 
@@ -108,7 +109,7 @@ export const VideoCard = ({ item, columns }: Props) => {
               動画を視聴する
             </h3>
 
-            {/* モーダル内コンテンツ（長文ディスクリプションでも見やすいようスクロール対応） */}
+            {/* モーダル内コンテンツ */}
             <div className="bg-gray-50 rounded-xl p-3 border border-gray-100 mb-5 overflow-y-auto max-h-[50vh]">
               {item.thumbnailUrl && (
                 <div className="aspect-video w-full rounded-lg overflow-hidden mb-2.5 flex-shrink-0">
