@@ -1,5 +1,5 @@
 // src/components/stream/StreamList.tsx
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Search, X, ChevronDown } from "lucide-react";
 import type { StreamData } from "../../types";
 import { useUserRecords } from "../../hooks/useUserRecords";
@@ -8,6 +8,9 @@ import { useStreamFilters, MEMBERS } from "../../hooks/useStreamFilters";
 import { StreamCard } from "./StreamCard";
 import { MemberFilterModal } from "./MemberFilterModal";
 import { StreamDetailModal } from "./StreamDetailModal";
+
+// 🌟 おためしWith×MEETSのJSONをインポート
+import otameshiData from "../../data/otameshi_withmeets.json";
 
 const DynamicSelect = ({
   value,
@@ -48,6 +51,17 @@ export const StreamList = () => {
   const { records, updateRecord } = useUserRecords();
   const { streams, isLoading: loading, error } = useStreams();
 
+  // 🌟 通常の配信データにおためし蓮ノ空データをマージ
+  const combinedStreams = useMemo(() => {
+    const formattedOtameshi: StreamData[] = ((otameshiData as any[]) || []).map(item => ({
+      ...item,
+      type: "otameshi",
+      category: "おためし蓮ノ空",
+      is_official: item.is_official !== false
+    }));
+    return [...streams, ...formattedOtameshi];
+  }, [streams]);
+
   const {
     columns, setColumns,
     isFilterOpen, setIsFilterOpen,
@@ -64,7 +78,7 @@ export const StreamList = () => {
     displayStreams,
     isFilteringMembers,
     isAnyFilterActive
-  } = useStreamFilters(streams, records);
+  } = useStreamFilters(combinedStreams, records);
 
   const [isMemberPopupOpen, setIsMemberPopupOpen] = useState<boolean>(false);
   const [selectedStream, setSelectedStream] = useState<StreamData | null>(null);
@@ -85,9 +99,11 @@ export const StreamList = () => {
     { value: "106", label: "106期" },
   ];
 
+  // 🌟 「おためし蓮ノ空」を選択肢に追加
   const typeOptions = [
     { value: "all", label: "すべての配信" },
     { value: "with_meets", label: "With×MEETS" },
+    { value: "otameshi", label: "おためし蓮ノ空" },
     { value: "with_station", label: "With×STATION" },
     { value: "fes_live", label: "Fes×LIVE" },
     { value: "story", label: "活動記録" },
@@ -108,7 +124,7 @@ export const StreamList = () => {
   return (
     <div className="relative pb-24">
       
-      {/* 🌟 ヘッダー直下に完全密着固定（セーフエリア加算＋1px食い込みで隙間を完全に除去） */}
+      {/* ヘッダー直下に完全密着固定 */}
       <div className="fixed top-[calc(51px+env(safe-area-inset-top,0px))] left-0 right-0 z-20 bg-gray-50 border-b border-gray-200/80 shadow-xs">
         <div className="max-w-6xl mx-auto px-3 md:px-6 py-2.5">
           <div className="bg-white rounded-lg border border-gray-200 shadow-xs overflow-hidden">
@@ -235,7 +251,8 @@ export const StreamList = () => {
       </div>
 
       {/* 閉じた状態のフィルターの高さ＋余白分を確保し、その下から動画カードを流す */}
-<div className={`max-w-6xl mx-auto px-3 md:px-6 ${isFilterOpen ? "pt-[180px] sm:pt-[140px]" : "pt-[72px]"}`}>        <div className={`grid gap-3 sm:gap-4 ${gridClass}`}>
+      <div className={`max-w-6xl mx-auto px-3 md:px-6 ${isFilterOpen ? "pt-[180px] sm:pt-[140px]" : "pt-[72px]"}`}>
+        <div className={`grid gap-3 sm:gap-4 ${gridClass}`}>
           {displayStreams.map((stream) => (
             <StreamCard 
               key={stream.id}

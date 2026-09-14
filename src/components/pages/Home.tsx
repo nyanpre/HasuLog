@@ -1,5 +1,5 @@
 // src/components/pages/Home.tsx
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { LayoutList, Grid2X2, Grid3X3, ArrowUpDown, Loader2, Search } from 'lucide-react';
 
 import { StreamCard } from '../stream/StreamCard';
@@ -8,6 +8,9 @@ import { StreamSearchModal } from '../stream/StreamSearchModal';
 import { useUserRecords } from '../../hooks/useUserRecords';
 import { useStreams } from '../../contexts/StreamContext';
 import type { StreamData } from '../../types';
+
+// 🌟 おためしWith×MEETSのJSONをインポート
+import otameshiData from '../../data/otameshi_withmeets.json';
 
 type LayoutType = 1 | 2 | 4;
 type SortOrder = 'desc' | 'asc';
@@ -21,11 +24,25 @@ export default function Home() {
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
   const [isSearchOpen, setIsSearchOpen] = useState<boolean>(false);
 
-  const sortedStreams = [...streams].sort((a, b) => {
-    const timeA = new Date(a.date || 0).getTime();
-    const timeB = new Date(b.date || 0).getTime();
-    return sortOrder === 'desc' ? timeB - timeA : timeA - timeB;
-  });
+  // 🌟 通常のstreamsとおためしデータをマージ
+  const allStreams = useMemo(() => {
+    const formattedOtameshi: StreamData[] = ((otameshiData as any[]) || []).map(item => ({
+      ...item,
+      type: "otameshi",
+      category: "おためし蓮ノ空",
+      is_official: item.is_official !== false
+    }));
+    return [...streams, ...formattedOtameshi];
+  }, [streams]);
+
+  // 🌟 マージ後の allStreams をソート
+  const sortedStreams = useMemo(() => {
+    return [...allStreams].sort((a, b) => {
+      const timeA = new Date(a.date || 0).getTime();
+      const timeB = new Date(b.date || 0).getTime();
+      return sortOrder === 'desc' ? timeB - timeA : timeA - timeB;
+    });
+  }, [allStreams, sortOrder]);
 
   const gridClass =
     layout === 1 ? 'grid-cols-1 gap-4' :
@@ -93,7 +110,7 @@ export default function Home() {
           <div className="flex justify-center items-center py-20">
             <Loader2 className="animate-spin text-pink-500" size={32} />
           </div>
-        ) : streams.length === 0 ? (
+        ) : sortedStreams.length === 0 ? (
           <div className="text-center py-20 text-gray-500 text-sm">
             データがありません
           </div>
@@ -117,10 +134,11 @@ export default function Home() {
         )}
       </div>
 
+      {/* 🌟 モーダル検索にもマージ後の allStreams を渡す */}
       <StreamSearchModal
         isOpen={isSearchOpen}
         onClose={() => setIsSearchOpen(false)}
-        streams={streams}
+        streams={allStreams}
         onSelectStream={(stream) => setSelectedStream(stream)}
       />
 

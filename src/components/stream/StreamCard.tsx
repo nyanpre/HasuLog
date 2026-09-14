@@ -52,6 +52,10 @@ export const StreamCard = ({ stream, columns, viewCount, onClick }: Props) => {
   };
 
   const getBadgeInfo = () => {
+    // 🌟 おためし蓮ノ空用バッジ
+    if (stream.type === "otameshi") {
+      return { text: "おためし", bg: "bg-teal-600 text-white font-bold" };
+    }
     if (stream.type === "with_meets") {
       return { text: "MEETS", bg: "bg-pink-500 text-white" };
     }
@@ -59,11 +63,9 @@ export const StreamCard = ({ stream, columns, viewCount, onClick }: Props) => {
       return { text: "Fes×LIVE", bg: "bg-emerald-500 text-white" };
     }
     if (stream.type === "story") {
-      // 🌟 濃いめのオレンジ
       return { text: "活動記録", bg: "bg-orange-600 text-white" };
     }
     if (stream.type === "mirapa_mc") {
-      // 🌟 イエロー背景 ＋ 白文字
       return { text: "マイクラ", bg: "bg-yellow-500 text-white font-bold drop-shadow-xs" };
     }
     return { text: "STATION", bg: "bg-blue-500 text-white" };
@@ -134,14 +136,14 @@ export const StreamCard = ({ stream, columns, viewCount, onClick }: Props) => {
             <button 
               onClick={(e) => handleOpenConfirm('increase', e)}
               className="px-2.5 py-0.5 sm:py-1 text-gray-600 hover:bg-gray-200 transition-colors"
-            >+</button>
+            >＋</button>
           </div>
         </div>
       </div>
 
       {isConfirmOpen && (
         <div onClick={(e) => e.stopPropagation()}>
-          <WatchConfirmModal
+          <WatchConfirmModal 
             isOpen={isConfirmOpen}
             videoTitle={stream.title}
             actionType={actionMode}

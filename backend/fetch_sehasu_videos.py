@@ -1,6 +1,6 @@
-# backend/fetch_sehasu_videos.py
 import os
 import json
+import re
 from datetime import datetime
 from googleapiclient.discovery import build
 
@@ -9,6 +9,22 @@ if not YOUTUBE_API_KEY:
     raise ValueError("APIキーが設定されていません。環境変数 'YOUTUBE_API_KEY' を設定してください。")
 
 CHANNEL_HANDLE = 'lovelive_hasu'  # @lovelive_hasu
+
+def clean_description(desc: str) -> str:
+    """
+    半角または全角の「=」「＝」が3つ以上連続している箇所を検出し、
+    それ以降（===を含む）をすべて削除して直前の余分な改行や空白を除去する
+    """
+    if not desc:
+        return ""
+    
+    # [=＝]{3,} : 半角の = または全角の ＝ が3回以上連続するパターン
+    match = re.search(r'[=＝]{3,}', desc)
+    if match:
+        # マッチした位置より前の文字列だけを取り出し、末尾の改行・空白を削除
+        desc = desc[:match.start()]
+    
+    return desc.rstrip()
 
 def determine_season(date_str: str) -> str:
     """
@@ -88,9 +104,12 @@ def fetch_sehasu_videos():
             if title in ["Private video", "Deleted video"]:
                 continue
 
-            description = snippet.get('description', '')
-            if "#shorts" in title.lower() or "#shorts" in description.lower():
+            raw_description = snippet.get('description', '')
+            if "#shorts" in title.lower() or "#shorts" in raw_description.lower():
                 continue
+
+            # 🌟 「＝＝＝」以降を切り落とし、直前の\n\n等も除去
+            cleaned_description = clean_description(raw_description)
 
             if video_id not in unique_videos:
                 published_at = snippet.get('publishedAt', '')
@@ -127,7 +146,7 @@ def fetch_sehasu_videos():
                     "title": title,
                     "youtubeUrl": youtube_url,
                     "thumbnailUrl": thumbnail_url,
-                    "description": description,
+                    "description": cleaned_description,
                     "raw_title_node": title
                 }
 
