@@ -1,7 +1,7 @@
 // src/components/common/Layout.tsx
 import { useState, useEffect, type ReactNode } from "react";
 import { Outlet, Link } from "react-router-dom";
-import { Home, History, Rows3, User, Star, Archive } from "lucide-react"; 
+import { Home, History, Rows3, User, Star, Archive, Gamepad2 } from "lucide-react"; 
 import { HowToUseModal } from "./HowToUseModal";
 import { useAuth } from "../../contexts/AuthContext";
 import { doc, getDoc } from "firebase/firestore";
@@ -52,16 +52,31 @@ export default function Layout({ children }: LayoutProps) {
       <header className="bg-white shadow-sm fixed top-0 left-0 right-0 z-30 pt-safe-top">
         <div className="relative px-4 py-3 flex justify-center items-center h-[52px]">
           <h1 className="text-xl font-bold text-pink-500 tracking-wider">HasuLog</h1>
-          <button 
-            onClick={() => setIsHelpModalOpen(true)}
-            className="absolute right-4 text-xs font-bold text-gray-400 hover:text-gray-700 transition-colors cursor-pointer"
-          >
-            使い方
-          </button>
+          
+          {/* ヘッダー右側アクション（ゲーム & 使い方） */}
+          <div className="absolute right-4 flex items-center gap-2.5">
+            <Link 
+              to="/games"
+              className="inline-flex items-center gap-1 text-xs font-bold text-gray-500 hover:text-pink-500 transition-colors"
+            >
+              <Gamepad2 size={15} className="flex-shrink-0 -translate-y-[0.5px]" />
+              <span className="leading-none">ゲーム</span>
+            </Link>
+
+            <span className="text-gray-300 text-[11px] select-none">|</span>
+
+            <button 
+              type="button"
+              onClick={() => setIsHelpModalOpen(true)}
+              className="text-xs font-bold text-gray-500 hover:text-pink-500 transition-colors cursor-pointer leading-none"
+            >
+              使い方
+            </button>
+          </div>
         </div>
       </header>
 
-      {/* 🌟 他ページも素直にスクロールできるよう標準的なコンテナに復元 */}
+      {/* メインコンテンツ */}
       <main className="flex-1 pt-[52px] pb-24">
         {children || <Outlet />}
       </main>

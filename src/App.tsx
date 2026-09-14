@@ -13,8 +13,9 @@ import Profile from './components/pages/Profile';
 import { History } from './components/pages/History';
 import Timeline from './components/pages/Timeline';
 import Recommendation from './components/pages/Recommendation';
-// 🌟 追加: 新しく作るRelatedコンポーネントをインポート
 import Related from './components/pages/Related'; 
+import { GamesHub } from './components/pages/games/GamesHub';
+import { TimelineGamePage } from './components/pages/games/TimelineGamePage';
 
 export default function App() {
   const { currentUser, loading } = useAuth();
@@ -56,8 +57,11 @@ export default function App() {
               <Route path="/profile" element={<Profile />} />
               <Route path="/timeline" element={<Timeline />} />
               <Route path="/recommendation" element={<Recommendation />} />
-              {/* 🌟 追加: /related へのルーティング */}
               <Route path="/related" element={<Related />} />
+              
+              {/* ゲーム用ルーティング */}
+              <Route path="/games" element={<GamesHub />} />
+              <Route path="/games/timeline" element={<TimelineGamePage />} />
               
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
@@ -77,14 +81,14 @@ export default function App() {
         
         <button 
           onClick={handleLogin}
-          className="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded transition duration-200 mb-3"
+          className="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded transition duration-200 mb-3 cursor-pointer"
         >
           Googleでログイン
         </button>
         
         <button 
           onClick={handleGuestLogin}
-          className="w-full bg-gray-100 hover:bg-gray-200 text-gray-600 font-bold py-2 px-4 rounded transition duration-200 text-sm"
+          className="w-full bg-gray-100 hover:bg-gray-200 text-gray-600 font-bold py-2 px-4 rounded transition duration-200 text-sm cursor-pointer"
         >
           ゲストとして利用する（機能制限あり）
         </button>
