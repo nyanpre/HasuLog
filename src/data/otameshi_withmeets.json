@@ -1,7 +1,7 @@
 [
     {
         "id": "61736e92-1f83-4376-b0f9-5a194c684e91",
-        "season": "105Winter",
+        "season": "106Autumn",
         "type": "おためし蓮ノ空",
         "date": "2026/09/13",
         "title": "【SOUND ONLY #With蓮ノ空】姫芽のASMR",
@@ -10,6 +10,19 @@
         "thumbnailUrl": "https://i.ytimg.com/vi/c-pL3BlxZmY/maxresdefault.jpg",
         "description": "【SOUND ONLY #With蓮ノ空】ダミーヘッドマイクを使用した安養寺姫芽のASMR配信。前半は肩こり解消のストレッチを一緒に行い、後半はホラーゲーム実況に挑戦。",
         "raw_title_node": "2026/09/13 【SOUND ONLY #With蓮ノ空】姫芽のASMR",
+        "is_official": true
+    },
+    {
+        "id": "7071d261-b260-48d1-a613-0f5c07857db4",
+        "season": "106Autumn",
+        "type": "With×MEETS",
+        "date": "2026/09/27",
+        "title": "【SOUND ONLY #With蓮ノ空】セラス映画館",
+        "participants": "セラス 柳田 リリエンフェルト",
+        "youtubeUrl": "https://youtu.be/OTQmpf2baMc",
+        "thumbnailUrl": "https://i.ytimg.com/vi/OTQmpf2baMc/maxresdefault.jpg",
+        "description": "【SOUND ONLY #With蓮ノ空】おためし蓮ノ空第1弾として、SOUND ONLY #With蓮ノ空 が全2回でおためしスタート！",
+        "raw_title_node": "2026/09/27 【SOUND ONLY #With蓮ノ空】セラス映画館",
         "is_official": true
     }
 ]

@@ -18,17 +18,15 @@ def clean_description(desc: str) -> str:
     if not desc:
         return ""
     
-    # [=＝]{3,} : 半角の = または全角の ＝ が3回以上連続するパターン
     match = re.search(r'[=＝]{3,}', desc)
     if match:
-        # マッチした位置より前の文字列だけを取り出し、末尾の改行・空白を削除
         desc = desc[:match.start()]
     
     return desc.rstrip()
 
 def determine_season(date_str: str) -> str:
     """
-    2023/03/31までを103, 2024/03/31までを104, それ以降を105とする
+    2024/03/31までを103期、2025/03/31までを104期、それ以降を105期とする
     """
     try:
         if "/" in date_str:
@@ -36,8 +34,8 @@ def determine_season(date_str: str) -> str:
         else:
             dt = datetime.strptime(date_str, "%Y%m%d")
         
-        limit_103 = datetime(2023, 3, 31)
-        limit_104 = datetime(2024, 3, 31)
+        limit_103 = datetime(2024, 3, 31)
+        limit_104 = datetime(2025, 3, 31)
 
         if dt <= limit_103:
             return "103"
@@ -63,14 +61,49 @@ def get_channel_uploads_playlist_id(youtube, handle: str) -> str:
     uploads_id = items[0]['contentDetails']['relatedPlaylists']['uploads']
     return uploads_id
 
+def extract_video_id_from_item(entry: dict) -> str:
+    """ 既存データのidやyoutubeUrlからYouTubeの11桁video_idを抽出 """
+    url = entry.get("youtubeUrl", "")
+    match = re.search(r'(?:v=|\/|youtu\.be\/)([0-9A-Za-z_-]{11})', url)
+    if match:
+        return match.group(1)
+    
+    custom_id = entry.get("id", "")
+    if custom_id.startswith("sehasu-"):
+        parts = custom_id.split("-")
+        if len(parts) >= 3:
+            return parts[-1]
+    return ""
+
 def fetch_sehasu_videos():
-    print("🚀 YouTube Data APIを使用して全アップロード動画から『せーはす』を取得中...")
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    project_root = os.path.dirname(base_dir)
+    output_json_path = os.path.join(project_root, "src", "components", "related", "data", "sehasu_videos.json")
+
+    # 🌟 既存データの読み込みと既存Video IDの収集
+    existing_items = []
+    existing_video_ids = set()
+
+    if os.path.exists(output_json_path):
+        try:
+            with open(output_json_path, 'r', encoding='utf-8') as f:
+                existing_items = json.load(f)
+                for item in existing_items:
+                    v_id = extract_video_id_from_item(item)
+                    if v_id:
+                        existing_video_ids.add(v_id)
+            print(f"📄 既存ファイルから {len(existing_items)} 件（ID特定: {len(existing_video_ids)}件）を読み込みました。")
+        except Exception as e:
+            print(f"⚠️ 既存ファイルの読み込みに失敗しました（新規作成扱い）: {e}")
+            existing_items = []
+
+    print("🚀 YouTube Data APIを使用して新規『せーはす』動画を取得中...")
     youtube = build('youtube', 'v3', developerKey=YOUTUBE_API_KEY)
     
     uploads_playlist_id = get_channel_uploads_playlist_id(youtube, CHANNEL_HANDLE)
-    print(f"✅ アップロードプレイリストIDを特定しました: {uploads_playlist_id}")
+    print(f"✅ アップロードプレイリストID: {uploads_playlist_id}")
 
-    unique_videos = {}
+    new_videos = {}
     next_page_token = None
     total_scanned = 0
 
@@ -89,12 +122,16 @@ def fetch_sehasu_videos():
 
         items = response.get('items', [])
         total_scanned += len(items)
-        print(f"🔍 スキャン中... {total_scanned} 件走査済み (せーはす抽出: {len(unique_videos)} 件)")
+        print(f"🔍 スキャン中... {total_scanned} 件走査済み (新規抽出: {len(new_videos)} 件)")
 
         for item in items:
             snippet = item.get('snippet', {})
             video_id = snippet.get('resourceId', {}).get('videoId')
             if not video_id:
+                continue
+
+            # 🌟 既存ファイル、または今回のループ内ですでに取得済みの場合はスキップ
+            if video_id in existing_video_ids or video_id in new_videos:
                 continue
 
             title = snippet.get('title', '')
@@ -108,67 +145,65 @@ def fetch_sehasu_videos():
             if "#shorts" in title.lower() or "#shorts" in raw_description.lower():
                 continue
 
-            # 🌟 「＝＝＝」以降を切り落とし、直前の\n\n等も除去
             cleaned_description = clean_description(raw_description)
 
-            if video_id not in unique_videos:
-                published_at = snippet.get('publishedAt', '')
-                if published_at:
-                    dt = datetime.fromisoformat(published_at.replace('Z', '+00:00'))
-                    formatted_date = dt.strftime("%Y/%m/%d")
-                    upload_date_str = dt.strftime("%Y%m%d")
-                else:
-                    formatted_date = datetime.now().strftime("%Y/%m/%d")
-                    upload_date_str = datetime.now().strftime("%Y%m%d")
+            published_at = snippet.get('publishedAt', '')
+            if published_at:
+                dt = datetime.fromisoformat(published_at.replace('Z', '+00:00'))
+                formatted_date = dt.strftime("%Y/%m/%d")
+                upload_date_str = dt.strftime("%Y%m%d")
+            else:
+                formatted_date = datetime.now().strftime("%Y/%m/%d")
+                upload_date_str = datetime.now().strftime("%Y%m%d")
 
-                season = determine_season(formatted_date)
+            season = determine_season(formatted_date)
 
-                thumbnails = snippet.get('thumbnails', {})
-                if 'maxres' in thumbnails:
-                    thumbnail_url = thumbnails['maxres']['url']
-                elif 'high' in thumbnails:
-                    thumbnail_url = thumbnails['high']['url']
-                elif 'medium' in thumbnails:
-                    thumbnail_url = thumbnails['medium']['url']
-                elif 'default' in thumbnails:
-                    thumbnail_url = thumbnails['default']['url']
-                else:
-                    thumbnail_url = f"https://i.ytimg.com/vi/{video_id}/hqdefault.jpg"
+            thumbnails = snippet.get('thumbnails', {})
+            if 'maxres' in thumbnails:
+                thumbnail_url = thumbnails['maxres']['url']
+            elif 'high' in thumbnails:
+                thumbnail_url = thumbnails['high']['url']
+            elif 'medium' in thumbnails:
+                thumbnail_url = thumbnails['medium']['url']
+            elif 'default' in thumbnails:
+                thumbnail_url = thumbnails['default']['url']
+            else:
+                thumbnail_url = f"https://i.ytimg.com/vi/{video_id}/hqdefault.jpg"
 
-                clean_id = f"sehasu-{upload_date_str}-{video_id}"
-                youtube_url = f"https://www.youtube.com/watch?v={video_id}"
+            clean_id = f"sehasu-{upload_date_str}-{video_id}"
+            youtube_url = f"https://www.youtube.com/watch?v={video_id}"
 
-                unique_videos[video_id] = {
-                    "id": clean_id,
-                    "season": season,
-                    "type": "せーはす",
-                    "date": formatted_date,
-                    "title": title,
-                    "youtubeUrl": youtube_url,
-                    "thumbnailUrl": thumbnail_url,
-                    "description": cleaned_description,
-                    "raw_title_node": title
-                }
+            new_videos[video_id] = {
+                "id": clean_id,
+                "season": season,
+                "type": "せーはす",
+                "date": formatted_date,
+                "title": title,
+                "youtubeUrl": youtube_url,
+                "thumbnailUrl": thumbnail_url,
+                "description": cleaned_description,
+                "raw_title_node": title
+            }
 
         next_page_token = response.get('nextPageToken')
         if not next_page_token:
             break
 
-    formatted_items = list(unique_videos.values())
-    formatted_items.sort(key=lambda x: x["date"], reverse=True)
+    new_items_list = list(new_videos.values())
 
-    if len(formatted_items) == 0:
-        print("⚠️ 抽出件数が0件だったため、JSONファイルの更新を中断しました。")
+    if len(new_items_list) == 0:
+        print("\n✨ 新規の動画はありませんでした（すべて既存データに含まれています）。")
         return
 
-    base_dir = os.path.dirname(os.path.abspath(__file__))
-    project_root = os.path.dirname(base_dir)
-    output_json_path = os.path.join(project_root, "src", "components", "related", "data", "sehasu_videos.json")
+    # 既存データと新規データを結合し、日付の降順でソート
+    all_items = existing_items + new_items_list
+    all_items.sort(key=lambda x: x.get("date", ""), reverse=True)
 
+    os.makedirs(os.path.dirname(output_json_path), exist_ok=True)
     with open(output_json_path, 'w', encoding='utf-8') as f:
-        json.dump(formatted_items, f, ensure_ascii=False, indent=2)
+        json.dump(all_items, f, ensure_ascii=False, indent=2)
         
-    print(f"\n🎉 抽出完了！ 正確な公開日を含めた {len(formatted_items)} 件の動画データを保存しました。")
+    print(f"\n🎉 完了！ 新規 {len(new_items_list)} 件を追加し、合計 {len(all_items)} 件を保存しました。")
     print(f"📁 保存先: {output_json_path}")
 
 if __name__ == "__main__":

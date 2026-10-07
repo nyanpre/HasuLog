@@ -1,6 +1,7 @@
 # backend/fetch_membership_videos.py
 import os
 import json
+import re
 import subprocess
 from datetime import datetime
 
@@ -26,11 +27,44 @@ def determine_season(date_str: str) -> str:
     except Exception:
         return "105"
 
+def extract_video_id_from_item(entry: dict) -> str:
+    """ 既存データの youtubeUrl や id から 11桁の video_id を抽出 """
+    url = entry.get("youtubeUrl", "")
+    match = re.search(r'(?:v=|\/|youtu\.be\/)([0-9A-Za-z_-]{11})', url)
+    if match:
+        return match.group(1)
+    
+    custom_id = entry.get("id", "")
+    if custom_id.startswith("membership-"):
+        parts = custom_id.split("-")
+        if len(parts) >= 3:
+            return parts[-1]
+    return ""
+
 def fetch_membership_videos():
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    project_root = os.path.dirname(base_dir)
+    output_json_path = os.path.join(project_root, "src", "components", "related", "data", "membership.json")
+
+    # 🌟 1. 既存の JSON データを読み込んで既存の video_id を収集
+    existing_items = []
+    existing_video_ids = set()
+
+    if os.path.exists(output_json_path):
+        try:
+            with open(output_json_path, 'r', encoding='utf-8') as f:
+                existing_items = json.load(f)
+                for item in existing_items:
+                    v_id = extract_video_id_from_item(item)
+                    if v_id:
+                        existing_video_ids.add(v_id)
+            print(f"📄 既存ファイルから {len(existing_items)} 件（ID特定: {len(existing_video_ids)}件）を読み込みました。")
+        except Exception as e:
+            print(f"⚠️ 既存ファイルの読み込みに失敗しました（新規作成扱い）: {e}")
+            existing_items = []
+
     print("🔄 yt-dlp を使用してチャンネルから『メンバーシップ限定動画』をスキャン中...")
 
-    # --flat-playlist で高速に全件取得
-    # ※ ローカル環境でブラウザから取得する場合は '--cookies-from-browser', 'chrome' などを追加可能
     command = [
         "yt-dlp",
         "--flat-playlist",
@@ -45,9 +79,11 @@ def fetch_membership_videos():
         print(f"❌ 取得エラー: {e}")
         return
 
-    formatted_items = []
     lines = result.stdout.strip().split('\n')
     print(f"📦 スキャン完了: {len(lines)} 件の動画から該当動画を抽出します...")
+
+    new_items = []
+    scanned_new_ids = set()
 
     for line in lines:
         if not line.strip():
@@ -65,6 +101,10 @@ def fetch_membership_videos():
 
         video_id = item.get("id", "")
         if not video_id:
+            continue
+
+        # 🌟 2. 既存データまたは今回のループ内で追加済みの場合はスキップ
+        if video_id in existing_video_ids or video_id in scanned_new_ids:
             continue
 
         youtube_url = f"https://www.youtube.com/watch?v={video_id}"
@@ -93,7 +133,7 @@ def fetch_membership_videos():
 
         clean_id = f"membership-{upload_date}-{video_id}"
 
-        formatted_items.append({
+        new_entry = {
             "id": clean_id,
             "season": season,
             "type": "メンバー限定",
@@ -104,24 +144,25 @@ def fetch_membership_videos():
             "description": description,
             "isMemberOnly": True,
             "raw_title_node": title
-        })
+        }
 
-    # 日付の新しい順にソート
-    formatted_items.sort(key=lambda x: x["date"], reverse=True)
+        new_items.append(new_entry)
+        scanned_new_ids.add(video_id)
 
-    if not formatted_items:
-        print("⚠️ 該当する動画が見つかりませんでした。")
+    # 🌟 3. 新規差分がない場合はファイル更新をスキップ
+    if not new_items:
+        print("\n✨ 新規のメンバーシップ動画はありませんでした（すべて既存データに含まれています）。")
         return
 
-    base_dir = os.path.dirname(os.path.abspath(__file__))
-    project_root = os.path.dirname(base_dir)
-    output_json_path = os.path.join(project_root, "src", "components", "related", "data", "membership.json")
+    # 🌟 4. 既存データと新規データを合算して最新日付順にソート
+    all_items = existing_items + new_items
+    all_items.sort(key=lambda x: x.get("date", ""), reverse=True)
 
     os.makedirs(os.path.dirname(output_json_path), exist_ok=True)
     with open(output_json_path, 'w', encoding='utf-8') as f:
-        json.dump(formatted_items, f, ensure_ascii=False, indent=2)
+        json.dump(all_items, f, ensure_ascii=False, indent=2)
 
-    print(f"\n🎉 抽出完了！ タイトルに「メンバーシップ限定動画」を含む {len(formatted_items)} 件を保存しました。")
+    print(f"\n🎉 完了！ 新規 {len(new_items)} 件を追加し、合計 {len(all_items)} 件を保存しました。")
     print(f"📁 保存先: {output_json_path}")
 
 if __name__ == "__main__":
