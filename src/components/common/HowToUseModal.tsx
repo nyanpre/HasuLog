@@ -93,7 +93,8 @@ export const HowToUseModal = ({ isOpen, onClose }: Props) => {
                     精一杯に花咲いたあの日々を胸に
                   </p>
 
-                  <p className="text-pink-600 font-bold text-base sm:text-lg pt-2 tracking-[0.08em] leading-relaxed">
+                  {/* 🌟 指定サイズ 0.925rem に調整 */}
+                  <p className="text-pink-600 font-bold text-[0.925rem] pt-2 tracking-[0.08em] leading-relaxed">
                     「いま」を共にする、あなたのための記録──
                   </p>
                 </div>
