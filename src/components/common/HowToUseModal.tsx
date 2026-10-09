@@ -1,6 +1,17 @@
 // src/components/common/HowToUseModal.tsx
 import * as Dialog from '@radix-ui/react-dialog';
-import { ChevronDown } from 'lucide-react';
+import { 
+  ChevronDown, 
+  BookOpen, 
+  Info, 
+  PlaySquare, 
+  FileText, 
+  Sparkles, 
+  Archive, 
+  User, 
+  Gamepad2, 
+  Dices
+} from 'lucide-react';
 
 type Props = {
   isOpen: boolean;
@@ -17,10 +28,26 @@ export const HowToUseModal = ({ isOpen, onClose }: Props) => {
           className="fixed z-50 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-lg bg-gray-50 rounded-2xl shadow-2xl flex flex-col max-h-[90vh] outline-none border border-gray-200 overflow-hidden"
           aria-describedby={undefined}
         >
+          {/* 🌟 位置移動なし・4秒かけて不透明度のみをフェードイン */}
+          <style>{`
+            @keyframes pureFadeIn {
+              0% {
+                opacity: 0;
+              }
+              100% {
+                opacity: 1;
+              }
+            }
+            .animate-pure-fade-in {
+              animation: pureFadeIn 4s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+            }
+          `}</style>
+
           {/* ヘッダー */}
           <div className="flex justify-between items-center px-4 py-3 border-b border-gray-200 bg-white">
-            <Dialog.Title className="font-bold text-gray-800 text-sm flex items-center gap-1.5">
-              <span>📖</span> HasuLog 使い方ガイド
+            <Dialog.Title className="font-bold text-gray-800 text-sm flex items-center gap-2">
+              <BookOpen size={16} className="text-gray-600" />
+              <span>HasuLog 使い方ガイド</span>
             </Dialog.Title>
             <Dialog.Close asChild>
               <button className="text-gray-400 hover:text-gray-700 transition-colors text-base px-2 font-bold cursor-pointer">
@@ -32,9 +59,9 @@ export const HowToUseModal = ({ isOpen, onClose }: Props) => {
           {/* スクロール可能領域 */}
           <div className="overflow-y-auto custom-scrollbar">
             
-            {/* 🌟 ファーストビュー：公式ストーリーイントロ完全再現エリア */}
+            {/* 🌟 ファーストビュー：公式ストーリーイントロ再現エリア */}
             <div className="min-h-[85vh] flex flex-col justify-between items-center text-center px-6 sm:px-10 py-14 sm:py-16 bg-[#F8F7F2] border-b border-gray-200/80 select-none">
-              <div className="my-auto space-y-8 animate-fade-in transition-all duration-1000 ease-out">
+              <div className="my-auto space-y-8 animate-pure-fade-in">
                 
                 {/* 見出し：HasuLog & 飾り線 */}
                 <div className="flex flex-col items-center">
@@ -66,9 +93,8 @@ export const HowToUseModal = ({ isOpen, onClose }: Props) => {
                     精一杯に花咲いたあの日々を胸に
                   </p>
 
-                  <p className="text-pink-600 font-bold text-base sm:text-lg pt-4 tracking-[0.08em] leading-relaxed">
-                    「いま」を共にする、<br />
-                    あなたのための記録──
+                  <p className="text-pink-600 font-bold text-base sm:text-lg pt-2 tracking-[0.08em] leading-relaxed">
+                    「いま」を共にする、あなたのための記録──
                   </p>
                 </div>
               </div>
@@ -86,7 +112,7 @@ export const HowToUseModal = ({ isOpen, onClose }: Props) => {
               {/* 1. ログインとゲスト利用について */}
               <section className="bg-white border border-blue-200 rounded-xl p-4 shadow-2xs">
                 <div className="flex items-center gap-2 mb-2 pb-2 border-b border-blue-100">
-                  <span className="text-blue-600 font-bold">ℹ️</span>
+                  <Info size={16} className="text-gray-600" />
                   <h3 className="font-bold text-blue-950 text-sm sm:text-base">
                     ログインとゲスト利用について
                   </h3>
@@ -115,26 +141,31 @@ export const HowToUseModal = ({ isOpen, onClose }: Props) => {
                         <td className="p-2.5 text-center text-emerald-600 font-bold">〇</td>
                       </tr>
                       <tr>
+                        <td className="p-2.5">ランダム動画Picker</td>
+                        <td className="p-2.5 text-center text-emerald-600 font-bold">〇</td>
+                        <td className="p-2.5 text-center text-emerald-600 font-bold">〇</td>
+                      </tr>
+                      <tr className="bg-blue-50/20">
                         <td className="p-2.5">みんなのメモ閲覧</td>
                         <td className="p-2.5 text-center text-emerald-600 font-bold">〇</td>
                         <td className="p-2.5 text-center text-emerald-600 font-bold">〇</td>
                       </tr>
-                      <tr className="bg-blue-50/20">
+                      <tr>
                         <td className="p-2.5">ミニゲームのプレイ</td>
                         <td className="p-2.5 text-center text-emerald-600 font-bold">〇</td>
                         <td className="p-2.5 text-center text-emerald-600 font-bold">〇</td>
                       </tr>
-                      <tr>
+                      <tr className="bg-blue-50/20">
                         <td className="p-2.5">今日のおすすめ閲覧</td>
                         <td className="p-2.5 text-center text-gray-300 font-bold">✕</td>
                         <td className="p-2.5 text-center text-emerald-600 font-bold">〇</td>
                       </tr>
-                      <tr className="bg-blue-50/20">
+                      <tr>
                         <td className="p-2.5">記録・お気に入り・メモ保存</td>
                         <td className="p-2.5 text-center text-gray-300 font-bold">✕</td>
                         <td className="p-2.5 text-center text-emerald-600 font-bold">〇</td>
                       </tr>
-                      <tr>
+                      <tr className="bg-blue-50/20">
                         <td className="p-2.5">マイページ・アクティビティ・フレンド</td>
                         <td className="p-2.5 text-center text-gray-300 font-bold">✕</td>
                         <td className="p-2.5 text-center text-emerald-600 font-bold">〇</td>
@@ -147,7 +178,7 @@ export const HowToUseModal = ({ isOpen, onClose }: Props) => {
               {/* 2. 視聴記録とお気に入り */}
               <section className="bg-white border border-gray-200 rounded-xl p-4 shadow-2xs space-y-3">
                 <div className="flex items-center gap-2 pb-2 border-b border-gray-100">
-                  <span className="text-gray-600 font-bold">▶️</span>
+                  <PlaySquare size={16} className="text-gray-600" />
                   <h3 className="font-bold text-gray-900 text-sm sm:text-base">
                     視聴記録とお気に入り
                   </h3>
@@ -162,7 +193,7 @@ export const HowToUseModal = ({ isOpen, onClose }: Props) => {
                   <li className="flex items-start gap-2.5">
                     <span className="bg-gray-100 border border-gray-200 text-gray-700 px-2 py-0.5 rounded text-xs font-bold whitespace-nowrap mt-0.5">お気に入り</span>
                     <p className="text-xs sm:text-sm leading-relaxed text-gray-600">
-                      詳細画面右上の<strong className="text-amber-500 font-bold">☆</strong>マークを押すと<strong className="text-amber-500 font-bold">★</strong>に変わり、お気に入り登録されます。一覧のフィルターで素早く絞り込めます。
+                      詳細画面右上の星マークを押すとお気に入り登録されます。一覧のフィルターで素早く絞り込めます。
                     </p>
                   </li>
                 </ul>
@@ -171,7 +202,7 @@ export const HowToUseModal = ({ isOpen, onClose }: Props) => {
               {/* 3. 視聴メモと公開設定 */}
               <section className="bg-white border border-gray-200 rounded-xl p-4 shadow-2xs space-y-3">
                 <div className="flex items-center gap-2 pb-2 border-b border-gray-100">
-                  <span className="text-gray-600 font-bold">📝</span>
+                  <FileText size={16} className="text-gray-600" />
                   <h3 className="font-bold text-gray-900 text-sm sm:text-base">
                     視聴メモと公開設定
                   </h3>
@@ -195,29 +226,37 @@ export const HowToUseModal = ({ isOpen, onClose }: Props) => {
                 </div>
               </section>
 
-              {/* 4. 今日のおすすめと掲示板 */}
-              <section className="bg-white border border-gray-200 rounded-xl p-4 shadow-2xs space-y-2.5">
+              {/* 4. 今日のおすすめとランダム動画Picker */}
+              <section className="bg-white border border-gray-200 rounded-xl p-4 shadow-2xs space-y-3">
                 <div className="flex items-center gap-2 pb-2 border-b border-gray-100">
-                  <span className="text-gray-600 font-bold">✨</span>
+                  <Sparkles size={16} className="text-gray-600" />
                   <h3 className="font-bold text-gray-900 text-sm sm:text-base">
-                    今日のおすすめと掲示板
+                    おすすめとランダム動画Picker
                   </h3>
                 </div>
-                <p className="text-xs sm:text-sm leading-relaxed text-gray-600">
-                  ログイン中のユーザー向けに、<strong className="text-gray-800">「おすすめ」</strong>タブで毎日1本の動画が日替わりで自動選出されます（全動画が1巡するまで被りません）。
-                </p>
-                <div className="bg-amber-50/60 border border-amber-200/70 p-3 rounded-lg flex items-start gap-2">
-                  <span className="text-amber-700 text-xs mt-0.5">💬</span>
-                  <p className="text-xs sm:text-sm text-amber-950/80 leading-relaxed">
-                    おすすめ動画の下にある<strong className="text-amber-950">「デイリースレッド」</strong>で、その日の話題や感想を自由に投稿して他のユーザーと交流できます。
-                  </p>
+                <div className="space-y-3 text-xs sm:text-sm text-gray-600 leading-relaxed">
+                  <div>
+                    <strong className="text-gray-800">今日のおすすめ</strong>
+                    <p className="mt-0.5">
+                      ログイン中のユーザー向けに、毎日1本の動画が日替わりで自動選出されます（全動画が1巡するまで被りません）。動画下部のデイリースレッドで感想を投稿して交流できます。
+                    </p>
+                  </div>
+                  <div className="pt-1 border-t border-gray-100">
+                    <div className="flex items-center gap-1.5 font-bold text-gray-800 mb-1">
+                      <Dices size={15} className="text-gray-600" />
+                      <span>ランダム動画Picker</span>
+                    </div>
+                    <p>
+                      対象に含めたい期やカテゴリ（With×MEETS、活動記録、Fes×LIVE、みらくらマイクラ、せーはす、みらぱラジオ）を選んで「動画を引く」を押すと、条件に合った動画がランダムで1本選出されます。ログイン有無にかかわらず利用可能で、何を観るか迷ったときの動画選びに便利です。
+                    </p>
+                  </div>
                 </div>
               </section>
 
               {/* 5. 関連コンテンツ */}
               <section className="bg-white border border-gray-200 rounded-xl p-4 shadow-2xs space-y-2.5">
                 <div className="flex items-center gap-2 pb-2 border-b border-gray-100">
-                  <span className="text-gray-600 font-bold">🗂️</span>
+                  <Archive size={16} className="text-gray-600" />
                   <h3 className="font-bold text-gray-900 text-sm sm:text-base">
                     関連コンテンツ
                   </h3>
@@ -248,7 +287,7 @@ export const HowToUseModal = ({ isOpen, onClose }: Props) => {
               {/* 6. マイページとアクティビティ */}
               <section className="bg-white border border-gray-200 rounded-xl p-4 shadow-2xs space-y-3">
                 <div className="flex items-center gap-2 pb-2 border-b border-gray-100">
-                  <span className="text-gray-600 font-bold">📊</span>
+                  <User size={16} className="text-gray-600" />
                   <h3 className="font-bold text-gray-900 text-sm sm:text-base">
                     マイページとアクティビティ
                   </h3>
@@ -287,7 +326,7 @@ export const HowToUseModal = ({ isOpen, onClose }: Props) => {
               {/* 7. ミニゲーム（最下部） */}
               <section className="bg-white border border-gray-200 rounded-xl p-4 shadow-2xs space-y-2.5">
                 <div className="flex items-center gap-2 pb-2 border-b border-gray-100">
-                  <span className="text-gray-600 font-bold">🎮</span>
+                  <Gamepad2 size={16} className="text-gray-600" />
                   <h3 className="font-bold text-gray-900 text-sm sm:text-base">
                     ミニゲーム（時系列ソート）
                   </h3>
