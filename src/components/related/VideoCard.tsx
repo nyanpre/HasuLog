@@ -1,4 +1,4 @@
-// src/components/related/VideoCard.tsx 修正後
+// src/components/related/VideoCard.tsx
 import { useState } from "react";
 import { ExternalLink, X } from "lucide-react";
 import type { ContentItem } from "./types";
@@ -22,6 +22,7 @@ export const VideoCard = ({ item, columns }: Props) => {
   const isMirapa = item.category?.includes("みらぱ") || (item as any).type === "mirapa_radio" || (item as any).type === "みらぱラジオ";
   const isMembership = item.category?.includes("メンバー") || (item as any).type === "メンバー限定";
   const isIntro = item.category?.includes("自己紹介") || (item as any).type === "自己紹介";
+  const isBehind = item.category?.includes("Behind the Scenes") || (item as any).type === "Behind the Scenes";
 
   // 🌟 みらぱラジオの場合は「ラジオ」を表示
   const badgeText = isMirapa 
@@ -30,6 +31,8 @@ export const VideoCard = ({ item, columns }: Props) => {
     ? "メン限" 
     : isIntro 
     ? "自己紹介" 
+    : isBehind
+    ? "Behind the Scenes"
     : "せーはす";
 
   const badgeColor = isMirapa 
@@ -38,6 +41,8 @@ export const VideoCard = ({ item, columns }: Props) => {
     ? "bg-amber-500" 
     : isIntro 
     ? "bg-teal-500" 
+    : isBehind
+    ? "bg-indigo-500"
     : "bg-purple-500";
 
   return (

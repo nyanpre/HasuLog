@@ -6,13 +6,15 @@ import {
   Crown,
   UserCheck,
   Newspaper,
-  Radio
+  Radio,
+  Film // 🌟 Behind the Scenes用アイコンを追加
 } from 'lucide-react';
 
 import articlesData from '../related/data/articles.json';
 import sehasuData from '../related/data/sehasu_videos.json';
 import membershipData from '../related/data/membership.json';
 import introData from '../related/data/introduction_videos.json';
+import behindData from '../related/data/behind_the_scenes.json'; // 🌟 Behind the Scenesデータを追加
 import mirapaData from '../related/data/mirapa_radio.json'; // 🌟 みらぱラジオデータを追加
 import { ArticleViewerModal } from '../related/ArticleViewerModal';
 import { VideoList } from '../related/VideoList';
@@ -22,7 +24,8 @@ import type { ContentItem } from '../related/types';
 import { useUserData } from '../../hooks/useUserData';
 import { useAuth } from '../../contexts/AuthContext';
 
-type SectionType = 'media' | 'sehasu' | 'membership' | 'intro' | 'mirapa';
+// 🌟 'behind' を追加
+type SectionType = 'media' | 'sehasu' | 'membership' | 'intro' | 'behind' | 'mirapa';
 
 export default function Related() {
   const { currentUser } = useAuth();
@@ -82,6 +85,21 @@ export default function Related() {
     })) as ContentItem[];
   }, []);
 
+  // 🌟 Behind the Scenes データのマッピング
+  const behindContents = useMemo(() => {
+    return ((behindData as any[]) || []).map(v => ({
+      id: v.id,
+      season: v.season,
+      title: v.title,
+      description: v.description,
+      publishedDate: v.date,
+      category: "Behind the Scenes",
+      source: "YouTube",
+      thumbnailUrl: v.thumbnailUrl,
+      youtubeUrl: v.youtubeUrl
+    })) as ContentItem[];
+  }, []);
+
   // 🌟 みらぱラジオデータのマッピング（subCategory を保持）
   const mirapaContents = useMemo(() => {
     return ((mirapaData as any[]) || []).map(v => ({
@@ -117,6 +135,15 @@ export default function Related() {
       icon: <UserCheck size={24} />,
       iconBgClass: 'bg-teal-50 border-teal-100 text-teal-600',
       requiresEx: false, // 🌟 誰でも閲覧可能
+    },
+    {
+      id: 'behind' as SectionType, // 🌟 Behind the Scenes 追加
+      title: 'Behind the Scenes',
+      description: '105期メンバーの日常の一コマを描き下ろしイラストと共にお届けするボイスストーリー企画！',
+      count: behindContents.length,
+      icon: <Film size={24} />,
+      iconBgClass: 'bg-indigo-50 border-indigo-100 text-indigo-500',
+      requiresEx: false, // 🌟 誰でも閲覧可能（非認証・ゲストユーザーOK）
     },
     {
       id: 'mirapa' as SectionType,
@@ -203,6 +230,13 @@ export default function Related() {
         <VideoList 
           title="自己紹介動画一覧"
           items={introContents} 
+          onBack={() => setSelectedSection(null)} 
+        />
+      ) : selectedSection === 'behind' ? (
+        /* 🌟 Behind the Scenes 一覧画面 */
+        <VideoList 
+          title="Behind the Scenes 一覧"
+          items={behindContents} 
           onBack={() => setSelectedSection(null)} 
         />
       ) : selectedSection === 'media' && isEx ? (

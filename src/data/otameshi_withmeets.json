@@ -24,5 +24,44 @@
         "description": "【SOUND ONLY #With蓮ノ空】おためし蓮ノ空第1弾として、SOUND ONLY #With蓮ノ空 が全2回でおためしスタート！",
         "raw_title_node": "2026/09/27 【SOUND ONLY #With蓮ノ空】セラス映画館",
         "is_official": true
+    },
+    {
+        "id": "d86e2851-b67b-42df-801d-34f0d5e45f48",
+        "season": "106Autumn",
+        "type": "with_meets",
+        "date": "2026/10/12",
+        "title": "サイゼリヤでフルコース Curated by 桂城 泉",
+        "participants": "桂城 泉",
+        "youtubeUrl": "https://youtu.be/OWOqdg11v0U",
+        "thumbnailUrl": "https://i.ytimg.com/vi/OWOqdg11v0U/maxresdefault.jpg",
+        "description": "▼参考\nhttps://www.saizeriya.co.jp/\n\nおためし蓮ノ空第1弾として、SOUND ONLY #With蓮ノ空 がおためしスタート！",
+        "raw_title_node": "2026/10/12 「サイゼリヤでフルコース Curated by 桂城 泉」",
+        "is_official": true
+    },
+    {
+        "id": "2e38baac-b697-4786-b690-385a9343852d",
+        "season": "106Autumn",
+        "type": "with_meets",
+        "date": "2026/10/25",
+        "title": "村野さやかのラジオ番外編：おたよりスペシャル",
+        "participants": "村野さやか",
+        "youtubeUrl": "https://youtu.be/DaYHh2coA9Q",
+        "thumbnailUrl": "https://i.ytimg.com/vi/DaYHh2coA9Q/maxresdefault.jpg",
+        "description": "おためし蓮ノ空第1弾として、SOUND ONLY #With蓮ノ空 がおためしスタート！",
+        "raw_title_node": "2026/10/25 「村野さやかのラジオ番外編：おたよりスペシャル」",
+        "is_official": true
+    },
+    {
+        "id": "cad30db8-c5fc-4c03-a702-65d2f52ddd00",
+        "season": "106Autumn",
+        "type": "with_meets",
+        "date": "2026/11/08",
+        "title": "百生吟子の金沢紹介レベル1",
+        "participants": "百生吟子",
+        "youtubeUrl": "https://youtu.be/2Dna5yVkayk",
+        "thumbnailUrl": "https://i.ytimg.com/vi/2Dna5yVkayk/maxresdefault.jpg",
+        "description": "おためし蓮ノ空第1弾として、SOUND ONLY #With蓮ノ空 がおためしスタート！",
+        "raw_title_node": "2026/11/08 「百生吟子の金沢紹介レベル1」",
+        "is_official": true
     }
 ]

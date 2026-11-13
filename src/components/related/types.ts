@@ -7,7 +7,8 @@ export type Category =
   | '特設サイト' 
   | 'せーので！はすのそら！' 
   | 'メンバーシップ限定動画' 
-  | '自己紹介';
+  | '自己紹介'
+  | 'Behind the Scenes'; // 🌟 追加
 
 export interface ContentPart {
   label: string;
@@ -28,6 +29,10 @@ export interface ContentItem {
   contentUrl?: string;   // StorageパスまたはHTMLパス
   storageUrl?: string;   // Firebase Storage 公開URL
   youtubeUrl?: string;
-  archiveType?: 'media' | 'sehasu' | 'membership' | 'intro' | string;
+  archiveType?: 'media' | 'sehasu' | 'membership' | 'intro' | 'behind' | string; // 🌟 'behind' を追加
   parts?: ContentPart[];
 }
+
+// --------------------------------------------------
+// 🌟 楽曲アーカイブ用 型定義
+// --------------------------------------------------
